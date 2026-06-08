@@ -49,6 +49,9 @@ async def test_full_campaign_flow(convo):
     assert convo.draft["step"] == "ready"
     assert "модерац" in r7.assistant_message.lower()
     assert convo.draft["audience_reach"] > 0
+    # Name must be derived cleanly — no "Создай …/кампанию" leakage.
+    name = convo.draft["name"] or ""
+    assert name and "созда" not in name.lower() and "кампани" not in name.lower()
 
 
 async def test_channel_asked_when_not_specified(convo):

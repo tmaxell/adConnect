@@ -22,12 +22,12 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import UTC, datetime
 from typing import Any
 
 from agents.base import AgentContext, AgentResult
 from schemas import CampaignDraft, ChatAction
 from tools import creatives as creatives_tool
+from tools import naming
 from tools.brief import merge_updates, update_draft_from_message
 from tools.catalog import CHANNELS, SEGMENTS_BY_ID, match_segments
 from tools.forecast import apply_forecast
@@ -51,8 +51,6 @@ async def execute(ctx: AgentContext) -> AgentResult:
     if draft.goal is None:
         goal = ctx.inputs.get("goal") or ctx.message
         draft.goal = (goal or "").strip()[:200] or None
-        if draft.product is None and draft.goal:
-            draft.product = draft.goal
 
     # 1. Apply the turn. Actions either return a specialized result (suggest /
     #    generate / submit) or just mutate the draft (None → standard step flow).
@@ -66,6 +64,11 @@ async def execute(ctx: AgentContext) -> AgentResult:
     if result is None:
         apply_forecast(draft)
         draft.step = draft.current_step()
+        if draft.step == "confirmation" and not draft.name:
+            draft.name = await naming.generate_campaign_name(
+                draft.product, draft.goal,
+                channel=draft.channel, audience=draft.segments.matched_segment_name,
+            )
         result = _respond_for_step(draft)
 
     # 3. Persist the draft once and attach it to the result.
@@ -116,8 +119,9 @@ async def _handle_action(ctx: AgentContext, draft: CampaignDraft, action_id: str
 
     if action_id == "skip_creatives":
         if not draft.message.variants:
+            subject = naming.clean_subject(draft.product, draft.goal)
             draft.message.variants = await creatives_tool.generate_creatives(
-                product=draft.product, goal=draft.goal, channel=draft.channel or "sms",
+                product=subject, goal=draft.goal, channel=draft.channel or "sms",
             )
         draft.message.text = draft.message.variants[0] if draft.message.variants else \
             "Специальное предложение — подробности по ссылке."
@@ -130,7 +134,7 @@ async def _handle_action(ctx: AgentContext, draft: CampaignDraft, action_id: str
         return await _generate_creatives(ctx, draft)
 
     if action_id == "submit_campaign":
-        return _submit(draft)
+        return await _submit(draft)
 
     return None  # unknown action — fall through to the standard step response
 
@@ -158,8 +162,9 @@ async def _suggest_audience(ctx: AgentContext, draft: CampaignDraft) -> AgentRes
 async def _generate_creatives(ctx: AgentContext, draft: CampaignDraft) -> AgentResult:
     channel = draft.channel or "sms"
     audience = draft.segments.matched_segment_name or ", ".join(draft.segments.interests)
+    subject = naming.clean_subject(draft.product, draft.goal)
     variants = await creatives_tool.generate_creatives(
-        product=draft.product, goal=draft.goal, channel=channel, audience=audience,
+        product=subject, goal=draft.goal, channel=channel, audience=audience,
     )
     draft.message.variants = variants
     await ctx.emit("tool_called", detail=f"generate_creatives → {len(variants)} variant(s)")
@@ -177,14 +182,17 @@ async def _generate_creatives(ctx: AgentContext, draft: CampaignDraft) -> AgentR
     return _wrap(draft, "\n".join(lines), actions, substep="message")
 
 
-def _submit(draft: CampaignDraft) -> AgentResult:
+async def _submit(draft: CampaignDraft) -> AgentResult:
     apply_forecast(draft)
     if not draft.is_ready():
         # Guardrail: never submit an incomplete draft — return to the missing step.
         draft.step = draft.current_step()
         return _respond_for_step(draft)
     if not draft.name:
-        draft.name = _default_name(draft)
+        draft.name = await naming.generate_campaign_name(
+            draft.product, draft.goal,
+            channel=draft.channel, audience=draft.segments.matched_segment_name,
+        )
     draft.status = "submitted"
     draft.step = "ready"
     msg = (
@@ -270,7 +278,7 @@ def _ask_cost(draft: CampaignDraft) -> AgentResult:
 
 def _confirm(draft: CampaignDraft) -> AgentResult:
     if not draft.name:
-        draft.name = _default_name(draft)
+        draft.name = naming.derive_name(draft.product, draft.goal)
     msg = (
         "Кампания собрана. Проверьте параметры и отправьте на модерацию — "
         "запуска и списания не произойдёт без вашего подтверждения.\n\n"
@@ -321,12 +329,6 @@ def _budget_text(draft: CampaignDraft) -> str:
         est = f"{draft.estimated_cost:,.0f}".replace(",", " ")
         return f"{msgs} сообщений ≈ {est} ₽"
     return "—"
-
-
-def _default_name(draft: CampaignDraft) -> str:
-    now = datetime.now(UTC).strftime("%d.%m.%Y %H:%M")
-    base = (draft.product or "Кампания").strip()
-    return f"{base[:24]} {now}"[:35]
 
 
 # ── Draft persistence ───────────────────────────────────────────────────────────
