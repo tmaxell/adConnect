@@ -24,9 +24,20 @@ class FakeStore:
     def __init__(self) -> None:
         self.events: list[dict[str, Any]] = []
         self.artifacts: dict[str, list[dict[str, Any]]] = {}
+        self.campaigns: list[dict[str, Any]] = []
+        self.session_campaign_id: dict[str, int | None] = {}
 
     async def add_event(self, **kwargs: Any) -> None:
         self.events.append(kwargs)
+
+    async def save_campaign(self, *, session_id: str | None, draft: dict[str, Any],
+                            status: str = "moderation") -> int:
+        cid = len(self.campaigns) + 1
+        self.campaigns.append({"id": cid, "session_id": session_id, "status": status, "draft": draft})
+        return cid
+
+    async def set_campaign_id(self, *, session_id: str, campaign_id: int | None) -> None:
+        self.session_campaign_id[session_id] = campaign_id
 
     async def save_artifact(
         self,

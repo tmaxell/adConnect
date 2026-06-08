@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from models import (
     Base,
+    CampaignModel,
     ChatMessageModel,
     ChatRunEventModel,
     ChatRunModel,
@@ -324,6 +325,40 @@ class ChatStore:
             artifact = await db.get(SavedArtifactModel, artifact_id)
             return self._artifact_dict(artifact) if artifact else None
 
+    # ── Campaigns ─────────────────────────────────────────────────────────────
+
+    async def save_campaign(
+        self, *, session_id: str | None, draft: dict[str, Any], status: str = "moderation"
+    ) -> int:
+        """Persist a submitted campaign from a CampaignDraft snapshot. Returns its id."""
+        cost = draft.get("cost") or {}
+        async with session_scope() as db:
+            campaign = CampaignModel(
+                session_id=session_id,
+                name=str(draft.get("name") or "Рекламная кампания"),
+                channel=draft.get("channel"),
+                status=status,
+                audience_reach=int(draft.get("audience_reach") or 0),
+                price_per_message=float(draft.get("price_per_message") or 0.0),
+                estimated_cost=float(draft.get("estimated_cost") or 0.0),
+                budget=cost.get("budget"),
+                start_date=cost.get("start_date"),
+                end_date=cost.get("end_date"),
+                draft_json=draft,
+                created_at=_now(),
+                updated_at=_now(),
+            )
+            db.add(campaign)
+            await db.flush()
+            return campaign.id
+
+    async def list_campaigns(self) -> list[dict[str, Any]]:
+        async with session_scope() as db:
+            result = await db.scalars(
+                select(CampaignModel).order_by(CampaignModel.created_at.desc())
+            )
+            return [self._campaign_dict(c) for c in result]
+
     # ── Serializers ───────────────────────────────────────────────────────────
 
     @staticmethod
@@ -360,4 +395,21 @@ class ChatStore:
             "content": a.content_json,
             "metadata": a.metadata_json or {},
             "created_at": a.created_at.isoformat() if a.created_at else None,
+        }
+
+    @staticmethod
+    def _campaign_dict(c: CampaignModel) -> dict[str, Any]:
+        return {
+            "id": c.id,
+            "session_id": c.session_id,
+            "name": c.name,
+            "channel": c.channel,
+            "status": c.status,
+            "audience_reach": c.audience_reach,
+            "price_per_message": c.price_per_message,
+            "estimated_cost": c.estimated_cost,
+            "budget": c.budget,
+            "start_date": c.start_date,
+            "end_date": c.end_date,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
         }

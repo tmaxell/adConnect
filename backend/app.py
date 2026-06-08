@@ -107,6 +107,14 @@ async def list_session_messages(session_id: str):
     return {"messages": messages, "next_cursor": None, "has_more": False}
 
 
+# ── Campaigns ─────────────────────────────────────────────────────────────────
+
+@app.get("/api/campaigns")
+async def list_campaigns():
+    """Campaigns assembled by the agent — backs the Ad Campaigns list."""
+    return await store.list_campaigns()
+
+
 # ── Unified chat — supervisor entry point ─────────────────────────────────────
 
 @app.post("/api/chat", response_model=ChatResponse)

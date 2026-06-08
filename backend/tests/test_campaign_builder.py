@@ -53,6 +53,17 @@ async def test_full_campaign_flow(convo):
     name = convo.draft["name"] or ""
     assert name and "созда" not in name.lower() and "кампани" not in name.lower()
 
+    # The campaign is persisted exactly once with the draft snapshot.
+    assert len(convo.store.campaigns) == 1
+    saved = convo.store.campaigns[0]
+    assert saved["status"] == "moderation"
+    assert saved["draft"]["name"] == convo.draft["name"]
+    assert convo.store.session_campaign_id[convo.session_id] == saved["id"]
+
+    # Submitting again is idempotent — no duplicate campaign.
+    await convo.send(action=action("submit_campaign"))
+    assert len(convo.store.campaigns) == 1
+
 
 async def test_channel_asked_when_not_specified(convo):
     # No channel in the request → first question is the channel.

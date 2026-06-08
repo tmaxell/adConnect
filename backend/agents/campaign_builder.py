@@ -134,7 +134,7 @@ async def _handle_action(ctx: AgentContext, draft: CampaignDraft, action_id: str
         return await _generate_creatives(ctx, draft)
 
     if action_id == "submit_campaign":
-        return await _submit(draft)
+        return await _submit(ctx, draft)
 
     return None  # unknown action — fall through to the standard step response
 
@@ -182,8 +182,14 @@ async def _generate_creatives(ctx: AgentContext, draft: CampaignDraft) -> AgentR
     return _wrap(draft, "\n".join(lines), actions, substep="message")
 
 
-async def _submit(draft: CampaignDraft) -> AgentResult:
+async def _submit(ctx: AgentContext, draft: CampaignDraft) -> AgentResult:
     apply_forecast(draft)
+    # Idempotency: a campaign is created exactly once, on the first submit.
+    if draft.status == "submitted":
+        return AgentResult(
+            assistant_message=f"Кампания **«{draft.name}»** уже отправлена на модерацию.",
+            actions=[], status="ok", metadata={"stage": "done"},
+        )
     if not draft.is_ready():
         # Guardrail: never submit an incomplete draft — return to the missing step.
         draft.step = draft.current_step()
@@ -195,6 +201,14 @@ async def _submit(draft: CampaignDraft) -> AgentResult:
         )
     draft.status = "submitted"
     draft.step = "ready"
+
+    # Persist the campaign so it shows up in the Ad Campaigns list.
+    campaign_id = await ctx.store.save_campaign(
+        session_id=ctx.session_id, draft=draft.model_dump(mode="json"), status="moderation",
+    )
+    await ctx.store.set_campaign_id(session_id=ctx.session_id, campaign_id=campaign_id)
+    await ctx.emit("run_completed", detail=f"campaign #{campaign_id} submitted for moderation")
+
     msg = (
         f"Кампания **«{draft.name}»** собрана и отправлена на модерацию. "
         f"Списания и запуска не произошло — это произойдёт только после вашего подтверждения "
@@ -202,7 +216,7 @@ async def _submit(draft: CampaignDraft) -> AgentResult:
     )
     return AgentResult(
         assistant_message=msg, actions=[], status="ok",
-        metadata={"stage": "done"},
+        metadata={"stage": "done", "campaign_id": campaign_id},
     )
 
 
