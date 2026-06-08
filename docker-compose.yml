@@ -1,0 +1,34 @@
+# AdConnect — full stack (agent backend + frontend).
+#
+#   docker compose up --build
+#   open http://localhost:8080
+#
+# The backend runs in deterministic mode without an LLM key. To enable the LLM,
+# create backend/.env from backend/.env.example (it is loaded if present).
+
+services:
+  backend:
+    build: ./backend
+    env_file:
+      - path: ./backend/.env
+        required: false
+    volumes:
+      - adconnect-data:/app/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+
+volumes:
+  adconnect-data:
