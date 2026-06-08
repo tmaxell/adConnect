@@ -11,10 +11,10 @@ type WidgetMode = "fab" | "panel" | "expanded";
 type HistoryMode = "closed" | "open";
 
 const SUGGESTIONS: { label: string; prompt: string }[] = [
-  { label: "Кампания для фитнес-клуба", prompt: "Создай SMS-кампанию для моего фитнес-клуба, чтобы привлечь новых клиентов" },
-  { label: "Подобрать аудиторию", prompt: "Подбери аудиторию для службы доставки готовой еды" },
-  { label: "Сгенерировать креатив", prompt: "Сгенерируй варианты SMS для весенней акции в кофейне" },
-  { label: "Реклама автосервиса", prompt: "Собери кампанию по продвижению автосервиса" },
+  { label: "Создать рекламную кампанию", prompt: "Создай рекламную кампанию для моего бизнеса" },
+  { label: "Подобрать аудиторию", prompt: "Подбери аудиторию для моей кампании" },
+  { label: "Сгенерировать креатив", prompt: "Сгенерируй варианты текста для моего объявления" },
+  { label: "Рассчитать охват и бюджет", prompt: "Помоги рассчитать охват и бюджет кампании" },
   { label: "Вопрос по платформе", prompt: "Как создать рекламную кампанию в AdConnect?" },
 ];
 
@@ -400,8 +400,8 @@ export function FloatingWidget() {
         <button
           className="fw-fab"
           onClick={() => setMode("panel")}
-          aria-label="Открыть CVM Copilot"
-          title="CVM Copilot"
+          aria-label="Открыть AdConnect Copilot"
+          title="AdConnect Copilot"
         >
           <ChatIcon />
         </button>
@@ -450,7 +450,7 @@ export function FloatingWidget() {
                 <HistoryIcon />
               </button>
             )}
-            <div className="fw-header-title">CVM Copilot</div>
+            <div className="fw-header-title">AdConnect Copilot</div>
             <button className="fw-icon-btn" title="Новый диалог" onClick={() => void handleNewChat()}>
               <PlusIcon />
             </button>
