@@ -11,6 +11,7 @@ import {
   type ChatSession,
 } from "../../api/chatApi";
 import type { CampaignFlow } from "../../types/api";
+import type { CampaignDraft } from "../../types/campaign";
 import { normalizeUpsellFlow } from "../../components/flow/normalizeUpsellFlow";
 
 export interface ChatEntry extends ChatMessage {
@@ -23,6 +24,7 @@ interface ChatWorkspaceState {
   messages: ChatEntry[];
   artifacts: ChatArtifact[];
   draftFlow: CampaignFlow | null;
+  campaignDraft: CampaignDraft | null;
   loadingSessions: boolean;
   loadingMessages: boolean;
   sending: boolean;
@@ -34,6 +36,17 @@ interface ChatWorkspaceState {
 }
 
 const ChatWorkspaceContext = createContext<ChatWorkspaceState | null>(null);
+
+/** Latest `campaign_draft` artifact in the AdConnect wizard shape (has `step`). */
+function extractCampaignDraft(artifacts: ChatArtifact[]): CampaignDraft | null {
+  for (let i = artifacts.length - 1; i >= 0; i -= 1) {
+    const a = artifacts[i];
+    if (a.type === "campaign_draft" && a.content && typeof (a.content as { step?: unknown }).step === "string") {
+      return a.content as unknown as CampaignDraft;
+    }
+  }
+  return null;
+}
 
 function extractDraftFlow(artifacts: ChatArtifact[]): CampaignFlow | null {
   for (let i = artifacts.length - 1; i >= 0; i -= 1) {
@@ -238,6 +251,7 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
   );
 
   const draftFlow = useMemo(() => extractDraftFlow(artifacts), [artifacts]);
+  const campaignDraft = useMemo(() => extractCampaignDraft(artifacts), [artifacts]);
 
   const value = useMemo<ChatWorkspaceState>(
     () => ({
@@ -246,6 +260,7 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
       messages,
       artifacts,
       draftFlow,
+      campaignDraft,
       loadingSessions,
       loadingMessages,
       sending,
@@ -261,6 +276,7 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
       messages,
       artifacts,
       draftFlow,
+      campaignDraft,
       loadingSessions,
       loadingMessages,
       sending,

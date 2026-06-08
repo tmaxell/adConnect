@@ -6,6 +6,9 @@
  * AI-виджет (FloatingWidget). Логики нет — чистая визуальная реконструкция.
  */
 
+import { useChatWorkspaceStore } from "../chat-workspace/store/chatWorkspaceStore";
+import { CampaignWizard } from "./CampaignWizard";
+
 const USER_EMAIL = "ivani_gp@starcorp.com";
 
 // ── Demo-данные списка кампаний ───────────────────────────────────────────────
@@ -302,13 +305,14 @@ function AdcCampaignsScreen() {
 // ── Shell ──────────────────────────────────────────────────────────────────────
 
 export function AdConnectMock() {
+  const { campaignDraft } = useChatWorkspaceStore();
   return (
     <div className="ac-shell">
       <AdcTopbar />
       <div className="ac-body">
         <AdcSidebar />
         <main className="ac-main">
-          <AdcCampaignsScreen />
+          {campaignDraft ? <CampaignWizard draft={campaignDraft} /> : <AdcCampaignsScreen />}
         </main>
       </div>
     </div>
