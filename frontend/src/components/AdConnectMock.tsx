@@ -6,6 +6,8 @@
  * AI-виджет (FloatingWidget). Логики нет — чистая визуальная реконструкция.
  */
 
+import { useEffect, useState } from "react";
+import { listCampaigns, type CampaignSummary } from "../api/chatApi";
 import { useChatWorkspaceStore } from "../chat-workspace/store/chatWorkspaceStore";
 import { CampaignWizard } from "./CampaignWizard";
 
@@ -278,7 +280,49 @@ function CampaignListRow({ row }: { row: CampaignRow }) {
   );
 }
 
+function fmtNumber(n: number): string {
+  return n.toLocaleString("ru-RU").replace(/,/g, " ");
+}
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function mapStatus(status: string): CampaignRow["status"] {
+  if (status === "active") return "active";
+  if (status === "moderation") return "moderation";
+  return "draft";
+}
+
+function campaignToRow(c: CampaignSummary): CampaignRow {
+  const price = c.estimatedCost > 0 ? c.estimatedCost : c.budget ?? 0;
+  return {
+    name: c.name,
+    id: String(100000 + c.id),
+    created: c.createdAt ? `Date created: ${fmtDate(c.createdAt)}` : "",
+    period: c.startDate && c.endDate ? `${c.startDate}-${c.endDate}` : "—",
+    channel: (c.channel || "sms").toUpperCase(),
+    price: price > 0 ? `${fmtNumber(Math.round(price))} ₽` : "—",
+    status: mapStatus(c.status),
+  };
+}
+
 function AdcCampaignsScreen() {
+  // Load persisted campaigns; fall back to the demo list when there are none yet
+  // (fresh install / backend offline) so the screen still looks like the product.
+  const [rows, setRows] = useState<CampaignRow[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    listCampaigns()
+      .then((cs) => { if (!cancelled) setRows(cs.length ? cs.map(campaignToRow) : CAMPAIGNS); })
+      .catch(() => { if (!cancelled) setRows(CAMPAIGNS); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const list = rows ?? CAMPAIGNS;
   return (
     <div className="ac-card">
       <div className="ac-card-head">
@@ -296,12 +340,12 @@ function AdcCampaignsScreen() {
         <div className="ac-toolbar-actions">
           <button className="ac-toolbar-btn" type="button">Filters</button>
           <button className="ac-toolbar-btn" type="button">Sort by date</button>
-          <span className="ac-toolbar-count">10</span>
+          <span className="ac-toolbar-count">{list.length}</span>
         </div>
       </div>
 
       <div className="ac-list">
-        {CAMPAIGNS.map((row, i) => (
+        {list.map((row, i) => (
           <CampaignListRow key={i} row={row} />
         ))}
       </div>

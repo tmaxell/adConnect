@@ -244,3 +244,43 @@ export async function sendChat(sessionId: string, message: string, action?: Chat
     session_id: asString(o.session_id, sessionId),
   };
 }
+
+// ── Campaigns (Ad Campaigns list) ─────────────────────────────────────────────
+
+export interface CampaignSummary {
+  id: number;
+  name: string;
+  channel: string | null;
+  status: string;
+  audienceReach: number;
+  pricePerMessage: number;
+  estimatedCost: number;
+  budget: number | null;
+  startDate: string | null;
+  endDate: string | null;
+  createdAt: string | null;
+}
+
+function normalizeCampaign(raw: unknown): CampaignSummary {
+  const o = isObject(raw) ? raw : {};
+  const num = (v: unknown): number => (typeof v === "number" ? v : 0);
+  return {
+    id: typeof o.id === "number" ? o.id : 0,
+    name: asString(o.name, "Рекламная кампания"),
+    channel: asNullableString(o.channel),
+    status: asString(o.status, "moderation"),
+    audienceReach: num(o.audience_reach),
+    pricePerMessage: num(o.price_per_message),
+    estimatedCost: num(o.estimated_cost),
+    budget: typeof o.budget === "number" ? o.budget : null,
+    startDate: asNullableString(o.start_date),
+    endDate: asNullableString(o.end_date),
+    createdAt: asNullableString(o.created_at),
+  };
+}
+
+export async function listCampaigns(): Promise<CampaignSummary[]> {
+  const data = await http<unknown>("/api/campaigns");
+  const list = Array.isArray(data) ? data : isObject(data) && Array.isArray(data.campaigns) ? data.campaigns : [];
+  return list.map(normalizeCampaign);
+}
