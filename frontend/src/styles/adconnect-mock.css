@@ -1,0 +1,292 @@
+/* AdConnect mock — фоновый макет интерфейса продукта Eastwind AdConnect.
+   Воссоздан по экранам из adConnect/screens. */
+
+:root {
+  --ac-bg: #f1f1f1;            /* фон рабочей области */
+  --ac-surface: #ffffff;
+  --ac-border: #e2e8f0;
+  --ac-border-soft: #f1f5f9;
+  --ac-text: #1e293b;
+  --ac-text-secondary: #64748b;
+  --ac-text-muted: #94a3b8;
+  --ac-accent: #5257ff;
+  --ac-accent-soft: #ecf1ff;
+  --ac-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Шелл — на всю ширину viewport. Топбар закреплён сверху во всю ширину и не
+   зависит от dock-режима виджета; body ужимается справа на --fw-shell-shrink. */
+.ac-shell {
+  position: fixed;
+  inset: 0;
+  background: var(--ac-bg);
+  font-family: var(--ac-font);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ac-text);
+  z-index: 0;
+  user-select: none;
+  overflow: hidden;
+}
+
+/* ── Top bar ──────────────────────────────────────────────────────────────── */
+
+.ac-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 55px;
+  background: var(--ac-surface);
+  border-bottom: 1px solid var(--ac-border);
+  display: flex;
+  align-items: center;
+  z-index: 2;
+}
+.ac-topbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 270px;
+  padding-left: 20px;
+  flex-shrink: 0;
+}
+.ac-logo-text {
+  font-size: 18px;
+  font-weight: 700;
+  color: #201e3b;
+  letter-spacing: -0.01em;
+}
+.ac-logo-accent { color: var(--ac-accent); }
+.ac-topbar-email {
+  flex: 1;
+  padding-left: 17px;
+  font-size: 15px;
+  color: #212121;
+}
+.ac-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding-right: 24px;
+  flex-shrink: 0;
+}
+.ac-topbar-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 0;
+  color: #212121;
+  font-size: 14px;
+}
+.ac-logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid #90caf9;
+  border-radius: 8px;
+  color: #2196f3;
+  font-size: 14px;
+  padding: 7px 14px;
+}
+
+/* ── Body / layout ────────────────────────────────────────────────────────── */
+
+.ac-body {
+  position: absolute;
+  top: 55px;
+  left: 0;
+  right: var(--fw-shell-shrink, 0px);
+  bottom: 0;
+  display: flex;
+  transition: right 0.18s ease;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────────── */
+
+.ac-sidebar {
+  width: 270px;
+  flex-shrink: 0;
+  background: var(--ac-surface);
+  border-right: 1px solid var(--ac-border);
+  display: flex;
+  flex-direction: column;
+}
+.ac-side-nav { padding-top: 0; }
+.ac-side-footer { margin-top: auto; padding-bottom: 14px; }
+
+.ac-side-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 20px;
+  color: var(--ac-text);
+  font-size: 14px;
+}
+.ac-side-item-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.ac-side-item-active {
+  background: var(--ac-accent-soft);
+  box-shadow: inset 2px 0 0 var(--ac-accent);
+}
+.ac-side-add {
+  background: none;
+  border: 0;
+  padding: 0;
+  display: inline-flex;
+}
+.ac-side-sub {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 20px 0 52px;
+  color: var(--ac-text);
+  font-size: 14px;
+}
+.ac-side-lang { gap: 12px; }
+
+/* ── Main / card ──────────────────────────────────────────────────────────── */
+
+.ac-main {
+  flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 24px;
+}
+.ac-card {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  background: var(--ac-surface);
+  border: 1px solid var(--ac-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  padding: 24px 24px 16px;
+}
+.ac-card-head { margin-bottom: 16px; }
+.ac-card-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ac-text);
+}
+.ac-card-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ac-text-secondary);
+}
+
+/* Toolbar */
+.ac-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 12px 0 8px;
+}
+.ac-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--ac-border);
+  border-radius: 8px;
+  color: var(--ac-text-muted);
+}
+.ac-search-placeholder { font-size: 14px; }
+.ac-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-shrink: 0;
+}
+.ac-toolbar-btn {
+  background: none;
+  border: 0;
+  color: var(--ac-text-secondary);
+  font-size: 14px;
+}
+.ac-toolbar-count { color: var(--ac-text-muted); font-size: 14px; }
+
+/* List rows */
+.ac-list { border-top: 1px solid var(--ac-border-soft); }
+.ac-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--ac-border-soft);
+}
+.ac-row-icon { flex-shrink: 0; display: inline-flex; }
+.ac-row-body { flex: 1; min-width: 0; }
+.ac-row-name {
+  display: block;
+  color: var(--ac-accent);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ac-row-meta {
+  font-size: 12px;
+  color: var(--ac-text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ac-row-period,
+.ac-row-channel,
+.ac-row-price {
+  font-size: 13px;
+  color: var(--ac-text-secondary);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ac-row-period { flex: 0 1 auto; }
+.ac-row-channel { flex: 0 1 auto; }
+.ac-row-price { color: var(--ac-text); flex: 0 1 auto; text-align: right; }
+
+.ac-pill {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.ac-pill-moderation { color: #c026d3; border: 1px solid #f0abfc; background: #fdf4ff; }
+.ac-pill-active { color: #16a34a; border: 1px solid #bbf7d0; background: #f0fdf4; }
+.ac-pill-draft { color: #64748b; border: 1px solid #e2e8f0; background: #f8fafc; }
+
+/* Pagination */
+.ac-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding-top: 16px;
+}
+.ac-page {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ac-text-secondary);
+  font-size: 14px;
+}
+.ac-page-active { background: var(--ac-accent); color: #fff; }
