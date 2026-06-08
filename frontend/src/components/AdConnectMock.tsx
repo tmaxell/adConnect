@@ -29,13 +29,26 @@ const STATUS_META: Record<CampaignRow["status"], { label: string; className: str
   draft: { label: "Draft", className: "ac-pill-draft" },
 };
 
-const CAMPAIGNS: CampaignRow[] = Array.from({ length: 10 }, (_, i) => ({
-  name: "MasterTarget_long very tru_MasterTarget_long very...",
-  id: `0000000${i}`,
+const SMB_CAMPAIGNS: Array<{ name: string; channel: string; price: string }> = [
+  { name: "Фитнес-клуб «Энергия» — весенний набор", channel: "SMS", price: "25 000 ₽" },
+  { name: "Кофейня «Бариста» — акция на завтраки", channel: "SMS", price: "12 500 ₽" },
+  { name: "Автосервис «Гараж» — сезонная диагностика", channel: "Email", price: "8 000 ₽" },
+  { name: "Доставка еды «Вкусно и точка» — промо", channel: "SMS", price: "40 000 ₽" },
+  { name: "Студия маникюра «Лак» — приведи подругу", channel: "SMS", price: "9 900 ₽" },
+  { name: "Языковая школа «Lingva» — набор групп", channel: "Email", price: "15 000 ₽" },
+  { name: "Пекарня «Хлеб да соль» — открытие точки", channel: "SMS", price: "11 000 ₽" },
+  { name: "Барбершоп «Бритва» — скидка новым клиентам", channel: "SMS", price: "7 500 ₽" },
+  { name: "Цветочный «Букет» — 8 марта", channel: "SMS", price: "22 000 ₽" },
+  { name: "Стоматология «Улыбка» — чек-ап", channel: "Email", price: "18 000 ₽" },
+];
+
+const CAMPAIGNS: CampaignRow[] = SMB_CAMPAIGNS.map((c, i) => ({
+  name: c.name,
+  id: `${100240 + i}`,
   created: "Date created: 14.04.2025",
   period: "10.04.2025-20.05.2025",
-  channel: "SMS",
-  price: "25 000 ₽",
+  channel: c.channel,
+  price: c.price,
   status: "moderation" as const,
 }));
 
