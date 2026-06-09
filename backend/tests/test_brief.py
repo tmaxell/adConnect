@@ -23,8 +23,8 @@ async def test_detects_channel_email():
 
 async def test_detects_geography_and_interests():
     draft = await _merge("Реклама для тех, кто любит путешествия, в Москве и Питере")
-    assert "Moscow" in draft.segments.geography
-    assert "Saint-Petersburg" in draft.segments.geography
+    assert "Москва" in draft.segments.geography
+    assert "Санкт-Петербург" in draft.segments.geography
     assert "travel" in draft.segments.interests
 
 
@@ -53,7 +53,7 @@ def test_merge_extends_lists_uniquely():
     draft = CampaignDraft()
     merge_updates(draft, {"geography": ["Moscow"], "interests": ["travel"]})
     merge_updates(draft, {"geography": ["Moscow", "Kazan"]})
-    assert draft.segments.geography == ["Moscow", "Kazan"]
+    assert draft.segments.geography == ["Москва", "Казань"]
 
 
 def test_merge_ignores_empty_values():
@@ -67,3 +67,12 @@ async def test_detects_channel_meta():
     for phrase in ["Запусти рекламу в Instagram", "Хочу кампанию в Meta", "Реклама в фейсбуке"]:
         d = await _merge(phrase)
         assert d.channel == "meta", phrase
+
+
+async def test_geo_and_interests_canonicalized_no_duplicates():
+    # English-normalized (heuristic) + Russian-raw (LLM) must not duplicate.
+    draft = CampaignDraft()
+    merge_updates(draft, {"geography": ["Moscow"], "interests": ["sport"]})
+    merge_updates(draft, {"geography": ["Москва", "Казань"], "interests": ["спорт", "путешествия"]})
+    assert draft.segments.geography == ["Москва", "Казань"]
+    assert draft.segments.interests == ["sport", "travel"]

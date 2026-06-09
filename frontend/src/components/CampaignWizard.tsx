@@ -1,11 +1,14 @@
 /**
  * CampaignWizard — live reflection of the agent's `campaign_draft` on the
- * AdConnect campaign wizard. As the campaign-builder agent fills the draft turn
- * by turn, this canvas shows the matching wizard step pre-filled (channel,
- * segments, message, cost, confirmation) plus the reach/price panel.
+ * AdConnect campaign wizard. The audience step is channel-aware:
+ *  - messaging (SMS/Email): operator-base segments (gео/демография/доход/интересы)
+ *    with the per-dimension ₽ surcharge, as in the operator product.
+ *  - network (Meta): a Meta-style audience builder following real aggregators —
+ *    Локации (гео, первым — критично для локального МСБ) → Возраст и пол →
+ *    Детальные интересы → Источник (Custom Audience + lookalike) → Плейсменты.
+ *    No per-message ₽ surcharge; pricing is CPM only.
  *
- * Read-only: the agent drives via chat; the canvas displays state. The active
- * step follows `draft.step`.
+ * Read-only: the agent drives via chat; the canvas displays state.
  */
 
 import { isNetworkChannel, type CampaignDraft, type WizardStep } from "../types/campaign";
@@ -13,7 +16,7 @@ import { NETWORK_CHANNELS, OPERATOR_CHANNELS, type ChannelCard } from "./channel
 
 const CHANNEL_LABEL: Record<string, string> = { sms: "SMS", email: "Email", meta: "Meta" };
 function channelLabel(c: string | null): string {
-  return c ? CHANNEL_LABEL[c] ?? c.toUpperCase() : "New";
+  return c ? CHANNEL_LABEL[c] ?? c.toUpperCase() : "—";
 }
 
 const OBJECTIVE_LABEL: Record<string, string> = {
@@ -28,22 +31,33 @@ const PLATFORM_COLOR: Record<string, string> = {
   facebook: "#1877F2", instagram: "#E4405F",
   messenger: "#00B2FF", audience_network: "#5890FF",
 };
+const DEMOGRAPHICS_LABEL: Record<string, string> = { all: "Все", men: "Мужчины", women: "Женщины" };
+const INTEREST_LABEL: Record<string, string> = {
+  sport: "Спорт", travel: "Путешествия", tourism: "Туризм", movies: "Кино", walking: "Прогулки",
+  finance: "Финансы", technology: "Технологии", education: "Образование", food: "Еда",
+  fashion: "Мода", gaming: "Игры", business: "Бизнес", premium: "Премиум",
+  family: "Семья", kids: "Дети", entertainment: "Развлечения",
+};
+const mapInterests = (items: string[]) => items.map((t) => INTEREST_LABEL[t] ?? t);
 const ALL_PLACEMENTS = ["facebook", "instagram", "messenger", "audience_network"];
 
 function PlatformDot({ platform }: { platform: string }) {
   return <span className="acw-dot" style={{ background: PLATFORM_COLOR[platform] ?? "#94a3b8" }} />;
 }
 
-const STEP_LABELS: Record<Exclude<WizardStep, "ready">, string> = {
-  channel: "Sending Channel",
-  segments: "Segments",
-  message: "Message",
-  cost: "Cost",
-  confirmation: "Confirmation",
-};
 const STEP_ORDER: Array<Exclude<WizardStep, "ready">> = [
   "channel", "segments", "message", "cost", "confirmation",
 ];
+
+function stepLabel(step: Exclude<WizardStep, "ready">, network: boolean): string {
+  switch (step) {
+    case "channel": return "Канал";
+    case "segments": return network ? "Аудитория" : "Сегменты";
+    case "message": return "Сообщение";
+    case "cost": return "Стоимость";
+    case "confirmation": return "Подтверждение";
+  }
+}
 
 function fmt(n: number): string {
   return n.toLocaleString("ru-RU").replace(/,/g, " ");
@@ -56,12 +70,13 @@ function activeStep(draft: CampaignDraft): Exclude<WizardStep, "ready"> {
 // ── Step progress bar ──────────────────────────────────────────────────────────
 
 function StepBar({ draft }: { draft: CampaignDraft }) {
+  const network = isNetworkChannel(draft.channel);
   const current = activeStep(draft);
   const currentIdx = STEP_ORDER.indexOf(current);
   const submitted = draft.status === "submitted";
   return (
     <div className="acw-typecard">
-      <div className="acw-typename">{draft.channel ? `${channelLabel(draft.channel)} Campaign` : "New Campaign"}</div>
+      <div className="acw-typename">{draft.channel ? `Кампания ${channelLabel(draft.channel)}` : "Новая кампания"}</div>
       <div className="acw-steps">
         {STEP_ORDER.map((step, i) => {
           const done = submitted || i < currentIdx;
@@ -69,7 +84,7 @@ function StepBar({ draft }: { draft: CampaignDraft }) {
           return (
             <div key={step} className="acw-step">
               <div className={`acw-step-bar${done ? " done" : ""}${active ? " active" : ""}`} />
-              <span className={`acw-step-label${done || active ? " on" : ""}`}>{STEP_LABELS[step]}</span>
+              <span className={`acw-step-label${done || active ? " on" : ""}`}>{stepLabel(step, network)}</span>
             </div>
           );
         })}
@@ -85,7 +100,7 @@ function ReachPanel({ draft }: { draft: CampaignDraft }) {
   return (
     <aside className="acw-reach">
       <div className="acw-reach-num">{fmt(draft.audience_reach || 0)}</div>
-      <div className="acw-reach-cap">{network ? "Custom Audience" : "Audience reach"}</div>
+      <div className="acw-reach-cap">{network ? "Custom Audience" : "Охват аудитории"}</div>
       {network ? (
         <>
           <div className="acw-price-num">{draft.cpm || 0} ₽ <span className="acw-info">ⓘ</span></div>
@@ -106,7 +121,7 @@ function ReachPanel({ draft }: { draft: CampaignDraft }) {
       ) : (
         <>
           <div className="acw-price-num">{draft.price_per_message || 0} ₽ <span className="acw-info">ⓘ</span></div>
-          <div className="acw-reach-cap">Price per message</div>
+          <div className="acw-reach-cap">Цена за сообщение</div>
         </>
       )}
     </aside>
@@ -132,6 +147,19 @@ function Field({ label, children, badge }: { label: string; children: React.Reac
         {badge && <span className="acw-badge">{badge}</span>}
       </div>
       {children}
+    </div>
+  );
+}
+
+function GenderRadios({ value }: { value: string }) {
+  return (
+    <div className="acw-radios">
+      {(["all", "men", "women"] as const).map((d) => (
+        <label key={d} className="acw-radio-row">
+          <span className={`acw-radio${value === d ? " on" : ""}`} />
+          <span>{DEMOGRAPHICS_LABEL[d]}</span>
+        </label>
+      ))}
     </div>
   );
 }
@@ -174,102 +202,123 @@ function ChannelStep({ draft }: { draft: CampaignDraft }) {
   );
 }
 
-// ── Segments step ────────────────────────────────────────────────────────────────
+// ── Audience step — Meta (network) ───────────────────────────────────────────────
 
-function MetaSetup({ draft }: { draft: CampaignDraft }) {
+function MetaAudienceStep({ draft }: { draft: CampaignDraft }) {
+  const s = draft.segments;
   const reach = fmt(draft.audience_reach || 0);
   return (
-    <Field label="Meta setup">
-      <div className="acw-meta-setup">
-        <div className="acw-meta-account">
-          <span className="acw-meta-account-dot" />
-          Рекламный аккаунт ведётся через кабинет оператора (Business Manager) — подключать свой не нужно.
+    <>
+      <div className="acw-meta-account">
+        <span className="acw-meta-account-dot" />
+        Рекламный аккаунт ведётся через кабинет оператора (Business Manager) — подключать свой не нужно.
+      </div>
+
+      <Field label="Цель кампании">
+        <div className="acw-chips">
+          <span className="acw-chip acw-chip-accent">{OBJECTIVE_LABEL[draft.meta.objective] ?? draft.meta.objective}</span>
         </div>
-        <div className="acw-meta-row">
-          <span className="acw-meta-k">Цель</span>
-          <span>{OBJECTIVE_LABEL[draft.meta.objective] ?? draft.meta.objective}</span>
-        </div>
-        <div className="acw-meta-row">
-          <span className="acw-meta-k">Плейсменты</span>
-          <span className="acw-chips">
-            {ALL_PLACEMENTS.map((p) => {
-              const on = draft.meta.placements.includes(p);
-              return (
-                <span key={p} className={`acw-chip${on ? " acw-chip-accent" : " acw-chip-off"}`}>
-                  <PlatformDot platform={p} />{PLACEMENT_LABEL[p]}
-                </span>
-              );
-            })}
-          </span>
-        </div>
-        <div className="acw-meta-row">
-          <span className="acw-meta-k">Аудитория</span>
-          <span className="acw-meta-audience">Custom Audience · совпадение ≈ 60% · ≈ {reach} профилей</span>
-        </div>
+      </Field>
+
+      {/* Locations first — geo is the key lever for local SMB. */}
+      <div className="acw-geo">
+        <Field label="Локации">
+          <Chips items={s.geography} empty="Город или регион (можно радиус вокруг точки)" />
+          <div className="acw-hint">Города и регионы — ключевой таргетинг для локального бизнеса.</div>
+        </Field>
+      </div>
+
+      <Field label="Возраст и пол">
+        <GenderRadios value={s.demographics} />
+        <div className="acw-sub-field"><Chips items={s.age} empty="Возраст (например, 18–30)" /></div>
+      </Field>
+
+      <Field label="Детальный таргетинг">
+        <Chips items={mapInterests(s.interests)} empty="Интересы и поведение" />
+      </Field>
+
+      <Field label="Источник аудитории">
+        <div className="acw-meta-audience">Custom Audience (данные оператора) · совпадение ≈ 60% · ≈ {reach} профилей</div>
         <div className="acw-toggle-row">
           <span>Похожая аудитория (lookalike)</span>
           <span className={`acw-toggle${draft.meta.lookalike ? " on" : ""}`} />
         </div>
-      </div>
-    </Field>
+      </Field>
+
+      <Field label="Плейсменты">
+        <div className="acw-chips">
+          {ALL_PLACEMENTS.map((p) => {
+            const on = draft.meta.placements.includes(p);
+            return (
+              <span key={p} className={`acw-chip${on ? " acw-chip-accent" : " acw-chip-off"}`}>
+                <PlatformDot platform={p} />{PLACEMENT_LABEL[p]}
+              </span>
+            );
+          })}
+        </div>
+      </Field>
+    </>
   );
 }
 
-function SegmentsStep({ draft }: { draft: CampaignDraft }) {
+// ── Audience step — operator channels (SMS/Email) ────────────────────────────────
+
+function OperatorSegmentsStep({ draft }: { draft: CampaignDraft }) {
   const s = draft.segments;
   return (
     <>
-      {isNetworkChannel(draft.channel) && <MetaSetup draft={draft} />}
       {s.matched_segment_name && (
-        <Field label="Template / matched segment">
+        <Field label="Сегмент абонентской базы">
           <div className="acw-chips"><span className="acw-chip acw-chip-accent">{s.matched_segment_name}</span></div>
         </Field>
       )}
-      <Field label="Geography" badge="0.3 ₽">
-        <Chips items={s.geography} empty="Region or city" />
+      <Field label="География" badge="0.3 ₽">
+        <Chips items={s.geography} empty="Регион или город" />
       </Field>
-      <Field label="Demographics" badge="0.3 ₽">
-        <div className="acw-radios">
-          {(["all", "men", "women"] as const).map((d) => (
-            <label key={d} className="acw-radio-row">
-              <span className={`acw-radio${s.demographics === d ? " on" : ""}`} />
-              <span>{d === "all" ? "All" : d === "men" ? "Men" : "Woman"}</span>
-            </label>
-          ))}
-        </div>
-        <div className="acw-sub-field"><Chips items={s.age} empty="Age" /></div>
+      <Field label="Демография" badge="0.3 ₽">
+        <GenderRadios value={s.demographics} />
+        <div className="acw-sub-field"><Chips items={s.age} empty="Возраст" /></div>
       </Field>
-      <Field label="Income & Top-Ups">
-        <Chips items={[s.monthly_income, s.deposits_per_month].filter(Boolean) as string[]} empty="Monthly income / deposits" />
+      <Field label="Доход и пополнения">
+        <Chips items={[s.monthly_income, s.deposits_per_month].filter(Boolean) as string[]} empty="Доход / пополнения в месяц" />
       </Field>
-      <Field label="Interests & Additional Traits">
-        <Chips items={s.interests} empty="Interests" />
-        <div className="acw-sub-field"><Chips items={s.children_age} empty="Age of the children" /></div>
+      <Field label="Интересы и доп. признаки">
+        <Chips items={mapInterests(s.interests)} empty="Интересы" />
+        <div className="acw-sub-field"><Chips items={s.children_age} empty="Возраст детей" /></div>
       </Field>
       <div className="acw-toggle-row">
-        <span>Triggers</span>
+        <span>Триггеры</span>
         <span className={`acw-toggle${s.triggers_enabled ? " on" : ""}`} />
       </div>
     </>
   );
 }
 
+function SegmentsStep({ draft }: { draft: CampaignDraft }) {
+  return isNetworkChannel(draft.channel)
+    ? <MetaAudienceStep draft={draft} />
+    : <OperatorSegmentsStep draft={draft} />;
+}
+
 // ── Message step ─────────────────────────────────────────────────────────────────
 
 function MessageStep({ draft }: { draft: CampaignDraft }) {
   const m = draft.message;
+  const network = isNetworkChannel(draft.channel);
   return (
     <>
-      <Field label="Sender">
-        <div className="acw-input-mock">{m.sender || <span className="acw-placeholder">Sender name</span>}</div>
-      </Field>
-      <Field label="Message text">
+      {!network && (
+        <Field label="Отправитель">
+          <div className="acw-input-mock">{m.sender || <span className="acw-placeholder">Имя отправителя</span>}</div>
+        </Field>
+      )}
+      <Field label={network ? "Текст объявления" : "Текст сообщения"}>
         <div className="acw-textarea-mock">
-          {m.text || <span className="acw-placeholder">The agent will fill the message text here…</span>}
+          {m.text || <span className="acw-placeholder">Агент заполнит текст здесь…</span>}
         </div>
       </Field>
       {m.variants.length > 0 && (
-        <Field label="Generated variants">
+        <Field label="Сгенерированные варианты">
           <div className="acw-variants">
             {m.variants.map((v, i) => (
               <div key={i} className={`acw-variant${v === m.text ? " selected" : ""}`}>
@@ -291,9 +340,9 @@ function CostStep({ draft }: { draft: CampaignDraft }) {
   const network = isNetworkChannel(draft.channel);
   return (
     <>
-      <Field label="Cost">
+      <Field label="Бюджет">
         <div className="acw-input-mock">
-          {c.budget != null ? `${fmt(c.budget)} ₽` : <span className="acw-placeholder">Your campaign budget, ₽</span>}
+          {c.budget != null ? `${fmt(c.budget)} ₽` : <span className="acw-placeholder">Бюджет кампании, ₽</span>}
         </div>
         {network ? (
           draft.estimated_impressions > 0 && (
@@ -302,22 +351,22 @@ function CostStep({ draft }: { draft: CampaignDraft }) {
         ) : (
           <div className="acw-sub-field">
             <div className="acw-input-mock">
-              {c.messages_count != null ? `${fmt(c.messages_count)} messages` : <span className="acw-placeholder">Number of messages</span>}
+              {c.messages_count != null ? `${fmt(c.messages_count)} сообщений` : <span className="acw-placeholder">Число сообщений</span>}
             </div>
           </div>
         )}
       </Field>
-      <Field label="Ad Campaign Conditions">
+      <Field label="Условия кампании">
         <div className="acw-two-col">
-          <div className="acw-input-mock">{c.start_date || <span className="acw-placeholder">Start date</span>}</div>
-          <div className="acw-input-mock">{c.end_date || <span className="acw-placeholder">End date</span>}</div>
+          <div className="acw-input-mock">{c.start_date || <span className="acw-placeholder">Дата начала</span>}</div>
+          <div className="acw-input-mock">{c.end_date || <span className="acw-placeholder">Дата окончания</span>}</div>
         </div>
         <div className="acw-two-col">
-          <div className="acw-input-mock">{c.time_from || <span className="acw-placeholder">From</span>}</div>
-          <div className="acw-input-mock">{c.time_to || <span className="acw-placeholder">To</span>}</div>
+          <div className="acw-input-mock">{c.time_from || <span className="acw-placeholder">С</span>}</div>
+          <div className="acw-input-mock">{c.time_to || <span className="acw-placeholder">До</span>}</div>
         </div>
-        <div className="acw-toggle-row"><span>Uniform distribution</span><span className={`acw-toggle${c.uniform_distribution ? " on" : ""}`} /></div>
-        <div className="acw-toggle-row"><span>Autorun</span><span className={`acw-toggle${c.autorun ? " on" : ""}`} /></div>
+        <div className="acw-toggle-row"><span>Равномерное распределение</span><span className={`acw-toggle${c.uniform_distribution ? " on" : ""}`} /></div>
+        <div className="acw-toggle-row"><span>Автозапуск</span><span className={`acw-toggle${c.autorun ? " on" : ""}`} /></div>
       </Field>
     </>
   );
@@ -329,37 +378,37 @@ function ConfirmationStep({ draft }: { draft: CampaignDraft }) {
   const s = draft.segments;
   const network = isNetworkChannel(draft.channel);
   const rows: Array<[string, string]> = [
-    ["Channel", channelLabel(draft.channel)],
-    ["Demographics", s.demographics === "all" ? "All" : s.demographics],
-    ["Geography", s.geography.join(", ") || "Russia"],
-    ["Age", s.age.join(", ") || "—"],
-    ["Interests", s.interests.join(", ") || "—"],
+    ["Канал", channelLabel(draft.channel)],
+    ["Локации", s.geography.join(", ") || "Россия"],
+    ["Пол", DEMOGRAPHICS_LABEL[s.demographics] ?? s.demographics],
+    ["Возраст", s.age.join(", ") || "—"],
+    ["Интересы", mapInterests(s.interests).join(", ") || "—"],
   ];
   if (network) {
     const placements = draft.meta.placements.map((p) => PLACEMENT_LABEL[p] ?? p).join(", ");
-    rows.push(["Objective", OBJECTIVE_LABEL[draft.meta.objective] ?? draft.meta.objective]);
-    rows.push(["Placements", placements || "Facebook, Instagram"]);
-    rows.push(["Lookalike", draft.meta.lookalike ? "Да" : "Нет"]);
+    rows.push(["Цель", OBJECTIVE_LABEL[draft.meta.objective] ?? draft.meta.objective]);
+    rows.push(["Плейсменты", placements || "Facebook, Instagram"]);
+    rows.push(["Похожая аудитория", draft.meta.lookalike ? "Да" : "Нет"]);
     rows.push(["Custom Audience", fmt(draft.audience_reach)]);
     rows.push(["CPM", `${draft.cpm} ₽`]);
-    rows.push(["Est. impressions", fmt(draft.estimated_impressions)]);
+    rows.push(["Ожидаемые показы", fmt(draft.estimated_impressions)]);
   } else {
-    rows.push(["Income", s.monthly_income || "—"]);
-    rows.push(["Age of the children", s.children_age.join(", ") || "—"]);
+    rows.push(["Доход", s.monthly_income || "—"]);
+    rows.push(["Возраст детей", s.children_age.join(", ") || "—"]);
   }
   return (
     <>
-      <div className="acw-section-title">Audience parameters</div>
+      <div className="acw-section-title">Параметры аудитории</div>
       <div className="acw-summary">
         {rows.map(([k, v]) => (
           <div key={k} className="acw-summary-row"><span>{k}</span><span>{v}</span></div>
         ))}
       </div>
-      <Field label="The name of the advertising campaign">
-        <div className="acw-input-mock">{draft.name || <span className="acw-placeholder">Campaign name</span>}</div>
+      <Field label="Название кампании">
+        <div className="acw-input-mock">{draft.name || <span className="acw-placeholder">Название</span>}</div>
       </Field>
       {draft.message.text && (
-        <Field label="Message"><div className="acw-textarea-mock">{draft.message.text}</div></Field>
+        <Field label="Сообщение"><div className="acw-textarea-mock">{draft.message.text}</div></Field>
       )}
       {network && <AnalyticsPreview draft={draft} />}
       {draft.status === "submitted" && (
@@ -375,7 +424,6 @@ function AnalyticsPreview({ draft }: { draft: CampaignDraft }) {
   const rows = draft.platform_breakdown.length
     ? draft.platform_breakdown
     : [{ platform: "facebook", label: "Facebook", impressions: 0, reach: 0 }];
-  // Illustrative CTR / conversion rate per platform for the preview.
   const ctr: Record<string, number> = { facebook: 0.012, instagram: 0.016, messenger: 0.008, audience_network: 0.006 };
   const cvr: Record<string, number> = { facebook: 0.03, instagram: 0.035, messenger: 0.02, audience_network: 0.015 };
   const cpm = draft.cpm || 0;
@@ -426,7 +474,7 @@ export function CampaignWizard({ draft }: { draft: CampaignDraft }) {
   return (
     <div className="acw">
       <div className="acw-titlebar">
-        <span>{submitted ? draft.name || "Advertising campaign" : "Create an advertising campaign"}</span>
+        <span>{submitted ? draft.name || "Рекламная кампания" : "Создание рекламной кампании"}</span>
         <span className="acw-titlebar-actions">⧉ 🗑</span>
       </div>
 
@@ -438,9 +486,9 @@ export function CampaignWizard({ draft }: { draft: CampaignDraft }) {
       </div>
 
       <div className="acw-nav">
-        {step !== "channel" && <button className="acw-btn acw-btn-ghost" type="button">Back</button>}
+        {step !== "channel" && <button className="acw-btn acw-btn-ghost" type="button">Назад</button>}
         <button className={`acw-btn acw-btn-primary${submitted ? " done" : ""}`} type="button">
-          {submitted ? "Submitted" : isLast ? "Submit for moderation" : "Continue"}
+          {submitted ? "Отправлено" : isLast ? "Отправить на модерацию" : "Продолжить"}
         </button>
       </div>
     </div>

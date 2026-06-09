@@ -450,3 +450,7 @@
 .acw-meta-account-dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; flex-shrink: 0; }
 .acw-meta-audience { font-size: 13px; color: var(--ac-text-secondary); }
 .acw-chip .acw-dot { margin-right: 5px; }
+
+/* Geo highlighted as the primary lever in the Meta audience builder */
+.acw-geo { background: #f7f8ff; border: 1px solid #e3e6ff; border-radius: 10px; padding: 12px 14px; }
+.acw-geo .acw-field { gap: 6px; }

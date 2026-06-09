@@ -285,20 +285,27 @@ def _ask_channel(draft: CampaignDraft) -> AgentResult:
 
 
 def _ask_segments(draft: CampaignDraft) -> AgentResult:
-    landing = ""
-    if is_network_channel(draft.channel):
-        ci = CHANNELS[draft.channel]
-        landing = (
-            f" Для **{ci.label}** аудитория загружается как Custom Audience "
-            f"(хеши телефонов, совпадает ≈{ci.match_rate * 100:.0f}%)."
-        )
     prefilled = _audience_hint(draft)
     hint = f" Пока ориентируюсь на: {prefilled}." if prefilled else ""
-    msg = (
-        f"Канал: **{CHANNELS[draft.channel].label}**. Теперь — **аудитория**.{landing}{hint}\n\n"
-        f"Опишите, кого хотим охватить (гео, возраст, интересы), либо я подберу сегмент "
-        f"абонентской базы под вашу цель."
-    )
+
+    if is_network_channel(draft.channel):
+        ci = CHANNELS[draft.channel]
+        geo = ", ".join(draft.segments.geography)
+        geo_line = (
+            f"Гео уже задано: **{geo}**. " if geo
+            else "**В каком городе показываем рекламу?** Для локального бизнеса гео — самый важный таргетинг. "
+        )
+        msg = (
+            f"Канал: **{ci.label}**. Теперь — **аудитория**.{hint}\n\n"
+            f"{geo_line}Также можно задать возраст и интересы. Данные оператора подгружаются как "
+            f"Custom Audience (совпадение ≈{ci.match_rate * 100:.0f}%), при желании расширю похожей аудиторией."
+        )
+    else:
+        msg = (
+            f"Канал: **{CHANNELS[draft.channel].label}**. Теперь — **аудитория**.{hint}\n\n"
+            f"Опишите, кого хотим охватить (гео, возраст, интересы), либо я подберу сегмент "
+            f"абонентской базы под вашу цель."
+        )
     actions = [
         ChatAction(id="suggest_audience", label="Подобрать аудиторию за меня", kind="primary", payload={}),
         ChatAction(id="keep_audience", label="Продолжить с этой аудиторией", kind="default", payload={}),

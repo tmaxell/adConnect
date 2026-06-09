@@ -26,14 +26,14 @@ logger = logging.getLogger(__name__)
 # ── Reference data for the deterministic pass ─────────────────────────────────
 
 _GEO_ALIASES: dict[str, str] = {
-    "moscow": "Moscow", "москва": "Moscow", "москве": "Moscow",
-    "saint-petersburg": "Saint-Petersburg", "petersburg": "Saint-Petersburg",
-    "спб": "Saint-Petersburg", "питер": "Saint-Petersburg", "петербург": "Saint-Petersburg",
-    "krasnodar": "Krasnodarskiy kray", "краснодар": "Krasnodarskiy kray",
-    "russia": "Russia", "россия": "Russia", "рф": "Russia",
-    "novosibirsk": "Novosibirsk", "новосибирск": "Novosibirsk",
-    "ekaterinburg": "Ekaterinburg", "екатеринбург": "Ekaterinburg",
-    "kazan": "Kazan", "казань": "Kazan",
+    "moscow": "Москва", "москва": "Москва", "москве": "Москва",
+    "saint-petersburg": "Санкт-Петербург", "petersburg": "Санкт-Петербург",
+    "спб": "Санкт-Петербург", "питер": "Санкт-Петербург", "петербург": "Санкт-Петербург",
+    "krasnodar": "Краснодар", "краснодар": "Краснодар",
+    "russia": "Россия", "россия": "Россия", "рф": "Россия",
+    "novosibirsk": "Новосибирск", "новосибирск": "Новосибирск",
+    "ekaterinburg": "Екатеринбург", "екатеринбург": "Екатеринбург",
+    "kazan": "Казань", "казань": "Казань",
 }
 
 _INTEREST_ALIASES: dict[str, str] = {
@@ -222,6 +222,23 @@ def merge_updates(draft: CampaignDraft, updates: dict[str, Any]) -> CampaignDraf
     return draft
 
 
+def _canon_list_item(key: str, item: str) -> str:
+    """Normalize geo/interest values to a canonical form so the heuristic (English)
+    and the LLM (often Russian) don't produce duplicates like Moscow/Москва."""
+    raw = item.strip()
+    low = raw.lower()
+    if key == "geography":
+        return _GEO_ALIASES.get(low, raw)
+    if key == "interests":
+        if low in _INTEREST_ALIASES:
+            return _INTEREST_ALIASES[low]
+        for alias, canon in _INTEREST_ALIASES.items():
+            if low.startswith(alias) or (alias.startswith(low) and len(low) >= 3):
+                return canon
+        return raw
+    return raw
+
+
 def _apply_segment_field(draft: CampaignDraft, key: str, value: Any) -> None:
     seg = draft.segments
     if key == "demographics":
@@ -235,8 +252,8 @@ def _apply_segment_field(draft: CampaignDraft, key: str, value: Any) -> None:
         incoming = value if isinstance(value, list) else [value]
         current = list(getattr(seg, key))
         for item in incoming:
-            item_str = str(item)
-            if item_str not in current:
+            item_str = _canon_list_item(key, str(item))
+            if item_str and item_str not in current:
                 current.append(item_str)
         setattr(seg, key, current)
 
