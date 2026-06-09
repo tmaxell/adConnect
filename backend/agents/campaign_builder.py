@@ -97,17 +97,21 @@ async def execute(ctx: AgentContext) -> AgentResult:
 
 # ── Meta creative helpers ───────────────────────────────────────────────────────
 
-_FORMAT_LABEL = {"feed": "Лента", "stories": "Истории", "reels": "Reels", "whatsapp": "Click-to-WhatsApp"}
+_FORMAT_LABEL = {"feed": "Лента", "stories": "Истории", "reels": "Reels", "whatsapp": "WhatsApp"}
 _FORMAT_DEFAULT_MEDIA = {"feed": "image", "stories": "image", "reels": "video", "whatsapp": "image"}
+_FORMAT_ORDER = ("feed", "stories", "reels", "whatsapp")
 
 
 def _available_formats(placements: list[str]) -> list[str]:
     """Creative formats offered for the selected placements (mirrors the canvas)."""
-    out = ["feed"]
-    if "instagram" in placements or "facebook" in placements:
+    out: list[str] = []
+    if any(p in placements for p in ("facebook", "instagram", "messenger")):
+        out.append("feed")
+    if "facebook" in placements or "instagram" in placements:
         out += ["stories", "reels"]
-    out.append("whatsapp")  # Click-to-WhatsApp is a destination, always offerable
-    return out
+    if "whatsapp" in placements:
+        out.append("whatsapp")  # WhatsApp Status (9:16) + Click-to-WhatsApp chat
+    return [f for f in _FORMAT_ORDER if f in out] or ["feed"]
 
 
 # ── Actions ───────────────────────────────────────────────────────────────────

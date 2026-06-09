@@ -438,12 +438,13 @@
 .acw-chip-off { color: var(--ac-text-muted); background: #f8fafc; border: 1px dashed var(--ac-border); }
 
 /* Meta visual polish */
-.acw-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
-.acw-platform-name { display: inline-flex; align-items: center; }
+.acw-plogo { display: inline-block; width: 16px; height: 16px; margin-right: 6px; vertical-align: middle; flex-shrink: 0; }
+.acw-platform-name { display: inline-flex; align-items: center; gap: 2px; }
 .acw-meta-account { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #16a34a; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 8px 12px; }
 .acw-meta-account-dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; flex-shrink: 0; }
 .acw-meta-audience { font-size: 13px; color: var(--ac-text-secondary); }
-.acw-chip .acw-dot { margin-right: 5px; }
+.acw-chip .acw-plogo { margin-right: 5px; width: 15px; height: 15px; }
+.acw-chip-btn { display: inline-flex; align-items: center; }
 
 /* Geo highlighted as the primary lever in the Meta audience builder */
 .acw-geo { background: #f7f8ff; border: 1px solid #e3e6ff; border-radius: 10px; padding: 12px 14px; }

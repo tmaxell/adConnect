@@ -62,12 +62,36 @@ show the enhanced result. See `meta_integration_concept.md` §5 for the adapter 
 | Facebook / Instagram **Feed** | Лента | 1:1 (or 4:5) | image / video / carousel |
 | Stories | Истории | 9:16 | image / video |
 | Reels | Reels | 9:16 | video |
-| **Click-to-WhatsApp** | "WhatsApp" | feed/story creative | image / video + WhatsApp CTA (a *destination*, not a placement) |
+| **WhatsApp** | WhatsApp | 9:16 | image / video (Status ads, see §1.4) |
 
 Unified Stories/Reels **safe zone** since Mar 2026: keep text/logo within ~14% top /
 35% bottom / 6% sides. The canvas exposes exactly these as the format options
 (`availableFormats(placements)` in `CampaignWizard.tsx`, mirrored by
 `_available_formats` in `campaign_builder.py`).
+
+### 1.4 Advertising in WhatsApp — two ways, both supported
+
+There are **two** ways to advertise "in WhatsApp", and we surface both:
+
+1. **WhatsApp Status ads (a real placement).** Launched June 2025, ads appear in the
+   **Updates tab** between full-screen Status updates — WhatsApp's Stories analog.
+   Format is **9:16**, single image or video (≤30s), ephemeral (24h). In Ads Manager
+   you pick the **Messages** objective, link the WhatsApp account, and select the
+   **WhatsApp / Status placement** under placements. Requires the WhatsApp Business
+   Platform (API). → modelled as the `whatsapp` **placement**.
+2. **Click-to-WhatsApp (CTWA).** An ad on FB/IG/Messenger whose CTA opens a WhatsApp
+   **chat** with the business (a *destination*, not a placement). Strong for SMB lead
+   gen; "Cost per Conversation" is the key metric. → modelled as the `whatsapp`
+   **creative format** (9:16) + the "Написать в WhatsApp" CTA.
+
+In the prototype WhatsApp is therefore a first-class **placement** (chip with logo,
+share in the platform breakdown, in confirmation) and the WhatsApp creative format
+(9:16) becomes available when that placement is selected.
+
+Sources:
+- [Meta expands WhatsApp Status ad options — Search Engine Land](https://searchengineland.com/meta-expands-whatsapp-status-ad-options-462076)
+- [Meta Expands WhatsApp Status Ad Options — Social Media Today](https://www.socialmediatoday.com/news/meta-adds-whatsapp-click-to-message-whatsapp-status-ads/760186/)
+- [Meta Launches Ads on WhatsApp: Status and Channels (2025) — The Bridge Chronicle](https://www.thebridgechronicle.com/tech/meta-whatsapp-ads-rollout-status-channels-2025)
 
 ---
 

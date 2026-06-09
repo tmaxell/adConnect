@@ -38,9 +38,12 @@ _PAID_DIMENSION_SURCHARGE = 0.30
 _AVG_FREQUENCY = 1.8
 
 # Relative impression share per Meta publisher platform (normalized over selected).
-_PLATFORM_WEIGHT = {"facebook": 0.45, "instagram": 0.40, "messenger": 0.05, "audience_network": 0.10}
+_PLATFORM_WEIGHT = {
+    "facebook": 0.40, "instagram": 0.34, "whatsapp": 0.12,
+    "messenger": 0.05, "audience_network": 0.09,
+}
 _PLATFORM_LABEL = {
-    "facebook": "Facebook", "instagram": "Instagram",
+    "facebook": "Facebook", "instagram": "Instagram", "whatsapp": "WhatsApp",
     "messenger": "Messenger", "audience_network": "Audience Network",
 }
 

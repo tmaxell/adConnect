@@ -38,12 +38,8 @@ const ALL_OBJECTIVES: Array<keyof typeof OBJECTIVE_LABEL> = [
   "awareness", "traffic", "engagement", "leads", "sales",
 ];
 const PLACEMENT_LABEL: Record<string, string> = {
-  facebook: "Facebook", instagram: "Instagram",
-  messenger: "Messenger", audience_network: "Audience Network",
-};
-const PLATFORM_COLOR: Record<string, string> = {
-  facebook: "#1877F2", instagram: "#E4405F",
-  messenger: "#00B2FF", audience_network: "#5890FF",
+  facebook: "Facebook", instagram: "Instagram", messenger: "Messenger",
+  whatsapp: "WhatsApp", audience_network: "Audience Network",
 };
 const DEMOGRAPHICS_LABEL: Record<string, string> = { all: "Все", men: "Мужчины", women: "Женщины" };
 const INTEREST_LABEL: Record<string, string> = {
@@ -53,7 +49,7 @@ const INTEREST_LABEL: Record<string, string> = {
   family: "Семья", kids: "Дети", entertainment: "Развлечения",
 };
 const mapInterests = (items: string[]) => items.map((t) => INTEREST_LABEL[t] ?? t);
-const ALL_PLACEMENTS = ["facebook", "instagram", "messenger", "audience_network"];
+const ALL_PLACEMENTS = ["facebook", "instagram", "messenger", "whatsapp", "audience_network"];
 
 // Creative formats (placement positions / Click-to-WhatsApp destination).
 const FORMAT_ORDER: MetaFormat[] = ["feed", "stories", "reels", "whatsapp"];
@@ -61,18 +57,20 @@ const FORMAT_META: Record<MetaFormat, { label: string; ratio: string; hint: stri
   feed:     { label: "Лента",    ratio: "1:1",  hint: "Пост в ленте Facebook / Instagram" },
   stories:  { label: "Истории",  ratio: "9:16", hint: "Полноэкранные Stories" },
   reels:    { label: "Reels",    ratio: "9:16", hint: "Вертикальное видео Reels" },
-  whatsapp: { label: "WhatsApp", ratio: "1:1",  hint: "Click-to-WhatsApp: переход в чат" },
+  whatsapp: { label: "WhatsApp", ratio: "9:16", hint: "Статус в WhatsApp + переход в чат" },
 };
 
-/** Formats available for the currently selected placements. */
+/** Formats available for the currently selected placements (mirrors the backend). */
 function availableFormats(placements: string[]): MetaFormat[] {
-  const set = new Set<MetaFormat>(["feed"]);
+  const set = new Set<MetaFormat>();
+  if (["facebook", "instagram", "messenger"].some((p) => placements.includes(p))) set.add("feed");
   if (placements.includes("instagram") || placements.includes("facebook")) {
     set.add("stories");
     set.add("reels");
   }
-  set.add("whatsapp"); // Click-to-WhatsApp is a destination, always offerable
-  return FORMAT_ORDER.filter((f) => set.has(f));
+  if (placements.includes("whatsapp")) set.add("whatsapp"); // WhatsApp Status (9:16)
+  const out = FORMAT_ORDER.filter((f) => set.has(f));
+  return out.length ? out : ["feed"];
 }
 
 /** True only for real uploaded video files. Generated "video" assets are mock
@@ -92,8 +90,52 @@ function ctaLabel(objective: string, format: MetaFormat): string {
   }
 }
 
-function PlatformDot({ platform }: { platform: string }) {
-  return <span className="acw-dot" style={{ background: PLATFORM_COLOR[platform] ?? "#94a3b8" }} />;
+/** Brand logo for a Meta publisher platform (replaces the old colour dots). */
+function PlatformIcon({ platform }: { platform: string }) {
+  const common = { className: "acw-plogo", viewBox: "0 0 24 24", "aria-hidden": true } as const;
+  switch (platform) {
+    case "facebook":
+      return (
+        <svg {...common}><rect width="24" height="24" rx="6" fill="#1877F2" /><path fill="#fff" d="M16.5 8.3h-1.7c-.4 0-.8.4-.8.9V11h2.4l-.4 2.5h-2v6.4h-2.6v-6.4H9.3V11h2.1V9.1c0-1.9 1.2-3.1 3-3.1h2.1v2.3z" /></svg>
+      );
+    case "instagram":
+      return (
+        <svg {...common}>
+          <defs>
+            <radialGradient id="acw-ig" cx="0.3" cy="1.05" r="1.1">
+              <stop offset="0" stopColor="#FFD776" /><stop offset="0.25" stopColor="#F3A953" />
+              <stop offset="0.5" stopColor="#E8556E" /><stop offset="0.75" stopColor="#CE3AA6" />
+              <stop offset="1" stopColor="#7B43E3" />
+            </radialGradient>
+          </defs>
+          <rect width="24" height="24" rx="6" fill="url(#acw-ig)" />
+          <rect x="6" y="6" width="12" height="12" rx="4" fill="none" stroke="#fff" strokeWidth="1.7" />
+          <circle cx="12" cy="12" r="3.1" fill="none" stroke="#fff" strokeWidth="1.7" />
+          <circle cx="16.3" cy="7.7" r="1.05" fill="#fff" />
+        </svg>
+      );
+    case "messenger":
+      return (
+        <svg {...common}>
+          <defs>
+            <linearGradient id="acw-msgr" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0" stopColor="#0099FF" /><stop offset="0.6" stopColor="#A033FF" />
+              <stop offset="0.9" stopColor="#FF5280" /><stop offset="1" stopColor="#FF7061" />
+            </linearGradient>
+          </defs>
+          <path fill="url(#acw-msgr)" d="M12 2.2C6.4 2.2 2.2 6.3 2.2 11.7c0 2.9 1.2 5.4 3.2 7.1.2.1.3.4.3.6l.05 1.8c.02.6.6.9 1.1.7l2-.9c.16-.07.34-.08.5-.04.92.25 1.9.39 2.9.39 5.6 0 9.8-4.1 9.8-9.5S17.6 2.2 12 2.2z" />
+          <path fill="#fff" d="M6.1 14.6l2.9-4.6c.46-.73 1.45-.9 2.13-.39l2.3 1.72c.21.16.5.16.71 0l3.11-2.36c.42-.31.96.18.68.62l-2.9 4.6c-.46.73-1.45.9-2.13.39l-2.3-1.72a.6.6 0 0 0-.71 0L8.79 15.2c-.42.31-.96-.18-.68-.62z" />
+        </svg>
+      );
+    case "whatsapp":
+      return (
+        <svg {...common}><rect width="24" height="24" rx="6" fill="#25D366" /><path fill="#fff" d="M12 5.4a6.6 6.6 0 0 0-5.66 9.98L5.4 18.6l3.32-.92A6.6 6.6 0 1 0 12 5.4zm3.74 9.18c-.16.44-.92.84-1.27.86-.34.03-.66.16-2.22-.46-1.88-.74-3.06-2.66-3.15-2.78-.09-.12-.75-1-.75-1.9s.47-1.35.64-1.53c.16-.18.36-.22.48-.22l.34.01c.11 0 .26-.04.4.31.16.39.54 1.34.59 1.44.05.1.08.21.01.34-.36.72-.75.69-.55 1.03.75 1.29 1.5 1.73 2.64 2.3.19.1.31.08.42-.05.12-.13.49-.57.62-.76.13-.19.26-.16.44-.1.18.07 1.13.53 1.32.63.19.1.32.14.37.22.05.08.05.45-.11.89z" /></svg>
+      );
+    default: // audience_network → Meta network mark
+      return (
+        <svg {...common}><rect width="24" height="24" rx="6" fill="#0866FF" /><text x="12" y="16.5" textAnchor="middle" fontSize="13" fontWeight="700" fill="#fff">∞</text></svg>
+      );
+  }
 }
 
 const STEP_ORDER: Array<Exclude<WizardStep, "ready">> = [
@@ -313,7 +355,7 @@ function ReachPanel({ draft }: { draft: CampaignDraft }) {
             <div className="acw-platforms">
               {draft.platform_breakdown.map((p) => (
                 <div key={p.platform} className="acw-platform-row">
-                  <span className="acw-platform-name"><PlatformDot platform={p.platform} />{p.label}</span>
+                  <span className="acw-platform-name"><PlatformIcon platform={p.platform} />{p.label}</span>
                   <span>{fmt(p.impressions)}</span>
                 </div>
               ))}
@@ -461,7 +503,7 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
                 disabled={api.busy}
                 onClick={() => api.update({ toggle_placement: p })}
               >
-                <PlatformDot platform={p} />{PLACEMENT_LABEL[p]}
+                <PlatformIcon platform={p} />{PLACEMENT_LABEL[p]}
               </button>
             );
           })}

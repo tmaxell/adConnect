@@ -98,10 +98,11 @@ class SegmentSpec(BaseModel):
 
 MetaObjective = Literal["awareness", "traffic", "engagement", "leads", "sales"]
 
-# Publisher platforms (WhatsApp is reached via Click-to-WhatsApp, not a placement).
-META_PLACEMENTS: tuple[str, ...] = ("facebook", "instagram", "messenger", "audience_network")
+# Publisher platforms. WhatsApp became a real placement in 2025 (Status ads in the
+# Updates tab, 9:16); it also remains a Click-to-WhatsApp destination from FB/IG.
+META_PLACEMENTS: tuple[str, ...] = ("facebook", "instagram", "messenger", "whatsapp", "audience_network")
 
-# Ad creative format (maps to placement positions / Click-to-WhatsApp destination).
+# Ad creative format (placement position / WhatsApp Status + Click-to-WhatsApp).
 MetaFormat = Literal["feed", "stories", "reels", "whatsapp"]
 MediaType = Literal["none", "image", "video"]
 
