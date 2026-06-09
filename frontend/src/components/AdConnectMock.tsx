@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { listCampaigns, type CampaignSummary } from "../api/chatApi";
 import { useChatWorkspaceStore } from "../chat-workspace/store/chatWorkspaceStore";
 import { CampaignWizard } from "./CampaignWizard";
+import { LogoFull } from "./Logo";
 
 const USER_EMAIL = "ivani_gp@starcorp.com";
 
@@ -55,19 +56,6 @@ const CAMPAIGNS: CampaignRow[] = SMB_CAMPAIGNS.map((c, i) => ({
 }));
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
-
-function LogoMark() {
-  return (
-    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M11.529 9.30L7.774 5.545a10.5 10.5 0 0 0-2.227 2.227l3.756 3.756c.331.331.097.897-.371.897H6.118a10.6 10.6 0 0 0 0 3.15h5.312c.468 0 .702.566.371.896L6.5 22.273a10.6 10.6 0 0 0 2.227 2.226l5.803-5.802c.33-.331.896-.097.896.371v5.314a10.6 10.6 0 0 0 3.15 0v-5.314c0-.468.566-.702.896-.371l3.757 3.757a10.6 10.6 0 0 0 2.227-2.227l-3.756-3.755c-.33-.331-.096-.897.372-.897h5.311a10.6 10.6 0 0 0 0-3.15h-5.314c-.468 0-.702-.566-.371-.897l3.756-3.755a10.5 10.5 0 0 0-2.227-2.227l-3.755 3.756c-.331.33-.897.096-.897-.372V5.617a10.6 10.6 0 0 0-3.15 0v5.312c0 .468-.566.702-.896.371Z"
-        fill="#382DDD"
-      />
-    </svg>
-  );
-}
 
 function PlusBox() {
   return (
@@ -186,10 +174,7 @@ function AdcTopbar() {
   return (
     <header className="ac-topbar">
       <div className="ac-topbar-logo">
-        <LogoMark />
-        <span className="ac-logo-text">
-          Eastwind.<span className="ac-logo-accent">AdConnect</span>
-        </span>
+        <LogoFull />
       </div>
       <div className="ac-topbar-email">{USER_EMAIL}</div>
       <div className="ac-topbar-right">
