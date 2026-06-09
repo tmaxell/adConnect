@@ -120,12 +120,27 @@ def _estimate_messaging(draft: CampaignDraft) -> Forecast:
     )
 
 
+def _audience_multiplier(draft: CampaignDraft) -> float:
+    """How much the addressable audience widens beyond the Custom Audience seed.
+
+    Advantage+ lets Meta's AI find more buyers beyond your inputs; a manual
+    Lookalike widens proportionally to its % (1% closest/narrowest ↔ 10% broadest).
+    """
+    meta = draft.meta
+    if meta.audience_mode == "advantage":
+        return 1.7
+    if meta.lookalike:
+        return 1.0 + 0.3 * max(1, min(10, meta.lookalike_pct))
+    return 1.0
+
+
 def _estimate_network(draft: CampaignDraft, channel) -> Forecast:
     seg = draft.segments
     # Additional Meta targeting narrows the Custom Audience; match rate is the
-    # share of the operator segment that Meta can match to its users.
+    # share of the operator segment that Meta can match to its users. Advantage+
+    # / Lookalike then widen the addressable pool beyond the seed.
     narrowed = _narrow(_base_reach(seg), seg)
-    matched = int(narrowed * channel.match_rate)
+    matched = int(narrowed * channel.match_rate * _audience_multiplier(draft))
 
     cpm = channel.avg_cpm
     budget = draft.cost.budget or 0.0
@@ -147,7 +162,9 @@ def platform_breakdown(draft: CampaignDraft) -> list[PlatformStat]:
     Mirrors an Insights `publisher_platform` breakdown — the basis for the
     per-platform reporting we'll show after launch.
     """
-    places = draft.meta.placements or ["facebook", "instagram"]
+    # Advantage+ placements → Meta auto-distributes across every platform.
+    places = list(_PLATFORM_WEIGHT) if draft.meta.advantage_placements \
+        else (draft.meta.placements or ["facebook", "instagram"])
     weights = {p: _PLATFORM_WEIGHT.get(p, 0.10) for p in places}
     total = sum(weights.values()) or 1.0
     rows: list[PlatformStat] = []

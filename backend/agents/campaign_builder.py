@@ -26,7 +26,7 @@ import time
 from typing import Any
 
 from agents.base import AgentContext, AgentResult
-from schemas import CampaignDraft, ChatAction
+from schemas import META_PLACEMENTS, CampaignDraft, ChatAction
 from tools import creative_gen
 from tools import creatives as creatives_tool
 from tools import naming
@@ -102,8 +102,15 @@ _FORMAT_DEFAULT_MEDIA = {"feed": "image", "stories": "image", "reels": "video", 
 _FORMAT_ORDER = ("feed", "stories", "reels", "whatsapp")
 
 
+def _effective_placements(draft: CampaignDraft) -> list[str]:
+    """Placements that ads actually run on (all of them under Advantage+ placements)."""
+    if draft.meta.advantage_placements:
+        return list(META_PLACEMENTS)
+    return draft.meta.placements
+
+
 def _available_formats(placements: list[str]) -> list[str]:
-    """Creative formats offered for the selected placements (mirrors the canvas)."""
+    """Creative formats offered for the given placements (mirrors the canvas)."""
     out: list[str] = []
     if any(p in placements for p in ("facebook", "instagram", "messenger")):
         out.append("feed")
@@ -261,7 +268,7 @@ def _creative_actions(draft: CampaignDraft) -> list[ChatAction]:
         ChatAction(id="generate_creative_image", label="Сгенерировать видео",
                    kind="default", payload={"media_type": "video"}),
     ]
-    for fmt in _available_formats(draft.meta.placements):
+    for fmt in _available_formats(_effective_placements(draft)):
         if fmt == cr.format:
             continue
         actions.append(ChatAction(
@@ -444,7 +451,7 @@ def _ask_message(draft: CampaignDraft) -> AgentResult:
     if is_network_channel(draft.channel):
         cr = draft.meta.creative
         price_line = f"охват аудитории ≈ **{reach}**, оплата за показы (CPM ≈ {draft.cpm:.0f} ₽)"
-        formats = " · ".join(_FORMAT_LABEL[f] for f in _available_formats(draft.meta.placements))
+        formats = " · ".join(_FORMAT_LABEL[f] for f in _available_formats(_effective_placements(draft)))
         msg = (
             f"Аудитория готова: {price_line}.\n\n"
             f"Теперь **креатив**. Текущий формат — «**{_FORMAT_LABEL[cr.format]}**» "

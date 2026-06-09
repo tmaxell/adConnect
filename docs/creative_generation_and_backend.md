@@ -95,6 +95,33 @@ Sources:
 
 ---
 
+### 1.5 Audience model (Ad Set) — what we surface
+
+Meta's ad-set targeting has **four** methods (Core/detailed, Custom, Lookalike,
+Advantage+) which Ads Manager now presents as **two top-level modes**:
+
+- **Advantage+ Audience** (default) — AI finds buyers; your inputs are *suggestions*
+  (age, gender, detailed targeting, custom/lookalike), with a few *hard controls*
+  (location, min age, exclusions). 2025-26 best practice: feed a customer list as a
+  Custom Audience seed and let Advantage+ expand it (it does lookalike modelling
+  internally).
+- **Manual** — you control Core/Custom/Lookalike directly.
+
+The reworked audience screen mirrors this with **operator data = the Custom Audience
+seed**:
+- **Цель кампании** — the 5 relevant ODAX objectives as cards (icon + description).
+- **Метод подбора** — Advantage+ ↔ Ручная segmented control + an **audience-size
+  gauge** (Точная ↔ Широкая, like Meta's audience-definition needle).
+- **Источник** — Custom Audience (operator data, ~60% match) + **Lookalike** with a
+  1–10% slider (closer ↔ broader) in manual mode; built into Advantage+ otherwise.
+- **Локации** — kept first and tagged a *hard control* (applies even under Advantage+).
+- **Возраст / пол / детальный таргетинг** — labelled "подсказка для ИИ" under Advantage+.
+- **Плейсменты** — Advantage+ placements (auto) toggle vs manual chips.
+
+Backend: `MetaSpec.audience_mode` / `lookalike_pct` / `advantage_placements`;
+`forecast._audience_multiplier` widens reach (Advantage+ ×1.7; Lookalike ×(1+0.3·%));
+`platform_breakdown` spans all platforms under Advantage+ placements.
+
 ## 2. The interactive backend (what we built)
 
 The canvas was read-only (the agent drove everything via `/api/chat`). To let the

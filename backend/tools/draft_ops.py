@@ -39,6 +39,16 @@ def apply_patch(draft: CampaignDraft, patch: dict[str, Any]) -> CampaignDraft:
             meta.objective = value  # type: ignore[assignment]
         elif key == "lookalike":
             meta.lookalike = bool(value)
+        elif key == "audience_mode" and value in ("advantage", "manual"):
+            meta.audience_mode = value  # type: ignore[assignment]
+        elif key == "lookalike_pct":
+            try:
+                meta.lookalike_pct = max(1, min(10, int(value)))
+                meta.lookalike = True
+            except (TypeError, ValueError):
+                pass
+        elif key == "advantage_placements":
+            meta.advantage_placements = bool(value)
         elif key == "demographics" and value in ("all", "men", "women"):
             seg.demographics = value  # type: ignore[assignment]
         elif key == "audience_confirmed":

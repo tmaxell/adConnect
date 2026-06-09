@@ -78,6 +78,30 @@ def test_budget_and_message_text():
     assert d.message.text == "Скидка 20%"
 
 
+def test_audience_mode_and_lookalike_controls():
+    d = CampaignDraft()
+    apply_patch(d, {"audience_mode": "manual"})
+    assert d.meta.audience_mode == "manual"
+    # lookalike_pct is clamped to 1..10 and implies lookalike on
+    apply_patch(d, {"lookalike_pct": 25})
+    assert d.meta.lookalike_pct == 10 and d.meta.lookalike is True
+    apply_patch(d, {"lookalike_pct": 0})
+    assert d.meta.lookalike_pct == 1
+    apply_patch(d, {"advantage_placements": False})
+    assert d.meta.advantage_placements is False
+
+
+def test_advantage_mode_widens_reach():
+    from tools.forecast import estimate
+    seg_kwargs = dict(channel="meta", segments=CampaignDraft().segments)
+    manual = CampaignDraft(**seg_kwargs)
+    manual.segments.interests = ["sport"]
+    manual.meta.audience_mode = "manual"
+    advantage = manual.model_copy(deep=True)
+    advantage.meta.audience_mode = "advantage"
+    assert estimate(advantage).audience_reach > estimate(manual).audience_reach
+
+
 def test_generate_svg_dimensions_and_escaping():
     svg = generate_svg(fmt="stories", media_type="video", headline="A & B <test>", brand="Бренд")
     assert svg.startswith("<svg")

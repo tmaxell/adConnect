@@ -116,11 +116,22 @@ class MetaCreative(BaseModel):
     headline: str | None = None
 
 
+# Ad Set audience-building method (Meta's four targeting modes collapse to two
+# top-level choices in Ads Manager): Advantage+ Audience (AI finds buyers, your
+# inputs are *suggestions*) vs Manual (Core/Custom/Lookalike you control).
+AudienceMode = Literal["advantage", "manual"]
+
+
 class MetaSpec(BaseModel):
-    """Meta-specific campaign config (maps to Campaign objective + Ad Set placements)."""
+    """Meta-specific campaign config (maps to Campaign objective + Ad Set targeting)."""
     objective: MetaObjective = "traffic"
     placements: list[str] = Field(default_factory=lambda: ["facebook", "instagram"])
+    # Audience source: operator data → Custom Audience seed; optional Lookalike
+    # expansion (1–10%, closer ↔ broader); Advantage+ vs manual targeting mode.
+    audience_mode: AudienceMode = "advantage"
     lookalike: bool = False
+    lookalike_pct: int = 3                 # 1 = closest to source, 10 = broadest
+    advantage_placements: bool = True      # Advantage+ placements (auto) vs manual
     optimization_goal: str = "link_clicks"
     creative: MetaCreative = Field(default_factory=MetaCreative)
 

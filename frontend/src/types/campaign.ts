@@ -51,10 +51,15 @@ export interface MetaCreative {
   headline: string | null;
 }
 
+export type AudienceMode = "advantage" | "manual";
+
 export interface MetaSpec {
   objective: MetaObjective;
   placements: string[];
+  audience_mode: AudienceMode;
   lookalike: boolean;
+  lookalike_pct: number;
+  advantage_placements: boolean;
   optimization_goal: string;
   creative: MetaCreative;
 }

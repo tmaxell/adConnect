@@ -34,9 +34,30 @@ const OBJECTIVE_LABEL: Record<string, string> = {
   awareness: "Узнаваемость", traffic: "Трафик", engagement: "Вовлечённость",
   leads: "Лиды", sales: "Продажи",
 };
+// Short descriptions mirror Meta's ODAX objective definitions.
+const OBJECTIVE_DESC: Record<string, string> = {
+  awareness: "Максимум охвата и запоминаемости бренда",
+  traffic: "Переходы на сайт, в приложение или чат",
+  engagement: "Сообщения, реакции, просмотры, отклики",
+  leads: "Заявки и контакты: форма, чат, WhatsApp",
+  sales: "Покупки и конверсии",
+};
 const ALL_OBJECTIVES: Array<keyof typeof OBJECTIVE_LABEL> = [
   "awareness", "traffic", "engagement", "leads", "sales",
 ];
+
+/** Minimal line icon per ODAX objective. */
+function ObjectiveIcon({ objective }: { objective: string }) {
+  const p = { className: "acw-obj-icon", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  switch (objective) {
+    case "awareness": return <svg {...p}><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z" /><path d="M16 9a3 3 0 0 1 0 6M19 6a7 7 0 0 1 0 12" /></svg>;
+    case "traffic": return <svg {...p}><path d="M5 12h12M13 6l6 6-6 6" /></svg>;
+    case "engagement": return <svg {...p}><path d="M4 5h16v11H8l-4 4V5z" /><path d="M8 10h.01M12 10h.01M16 10h.01" /></svg>;
+    case "leads": return <svg {...p}><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>;
+    case "sales": return <svg {...p}><path d="M5 6h15l-1.5 8h-12L5 6z" /><path d="M5 6 4 3H2" /><circle cx="9" cy="20" r="1.4" /><circle cx="17" cy="20" r="1.4" /></svg>;
+    default: return <svg {...p}><circle cx="12" cy="12" r="8" /></svg>;
+  }
+}
 const PLACEMENT_LABEL: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram", messenger: "Messenger",
   whatsapp: "WhatsApp", audience_network: "Audience Network",
@@ -286,14 +307,69 @@ function Chips({ items, empty }: { items: string[]; empty: string }) {
   );
 }
 
-function Field({ label, children, badge }: { label: string; children: ReactNode; badge?: string }) {
+function Field({ label, children, badge, hint }: { label: string; children: ReactNode; badge?: string; hint?: string }) {
   return (
     <div className="acw-field">
       <div className="acw-field-head">
         <span className="acw-field-label">{label}</span>
         {badge && <span className="acw-badge">{badge}</span>}
       </div>
+      {hint && <div className="acw-hint acw-hint-top">{hint}</div>}
       {children}
+    </div>
+  );
+}
+
+// Distinct media-action icons (fixed 16px so the button width never reflows).
+function IconPhoto() {
+  return <svg className="acw-mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="8.5" cy="10" r="1.6" /><path d="m4 18 5-5 4 4 3-3 4 4" /></svg>;
+}
+function IconVideo() {
+  return <svg className="acw-mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="6" width="13" height="12" rx="2" /><path d="m16 10 5-3v10l-5-3z" /></svg>;
+}
+function IconUpload() {
+  return <svg className="acw-mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V5M8 9l4-4 4 4" /><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" /></svg>;
+}
+function Spinner() {
+  return <svg className="acw-mi acw-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 3a9 9 0 1 0 9 9" /></svg>;
+}
+
+/** Two-option segmented control (e.g. Advantage+ ↔ Manual). */
+function Segmented<T extends string>({ value, options, onChange, disabled }: {
+  value: T;
+  options: Array<{ value: T; label: string }>;
+  onChange: (v: T) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="acw-segmented">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          className={`acw-seg${value === o.value ? " on" : ""}`}
+          disabled={disabled}
+          onClick={() => onChange(o.value)}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Audience-size gauge (Specific ↔ Broad) — like Meta's audience-definition needle. */
+function AudienceGauge({ reach }: { reach: number }) {
+  const pos = Math.max(4, Math.min(96, Math.round((Math.log10(Math.max(reach, 1000)) - 3) / 4 * 100)));
+  const band = pos < 33 ? "Узкая" : pos < 67 ? "Сбалансированная" : "Широкая";
+  return (
+    <div className="acw-gauge">
+      <div className="acw-gauge-head">
+        <span>Размер аудитории</span>
+        <span className="acw-gauge-band">{band} · ≈ {fmt(reach)}</span>
+      </div>
+      <div className="acw-gauge-track"><span className="acw-gauge-needle" style={{ left: `${pos}%` }} /></div>
+      <div className="acw-gauge-ends"><span>Точная</span><span>Широкая</span></div>
     </div>
   );
 }
@@ -417,7 +493,10 @@ function ChannelStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
 
 function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   const s = draft.segments;
+  const m = draft.meta;
   const reach = fmt(draft.audience_reach || 0);
+  const advantage = m.audience_mode === "advantage";
+  const suggestHint = advantage ? "Подсказка для ИИ Meta" : undefined;
   return (
     <>
       <div className="acw-meta-account">
@@ -425,25 +504,81 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
         Рекламный аккаунт ведётся через кабинет оператора (Business Manager) — подключать свой не нужно.
       </div>
 
+      {/* Campaign objective — ODAX cards. */}
       <Field label="Цель кампании">
-        <div className="acw-chips">
+        <div className="acw-obj-grid">
           {ALL_OBJECTIVES.map((o) => (
             <button
               key={o}
               type="button"
-              className={`acw-chip acw-chip-btn${draft.meta.objective === o ? " acw-chip-accent" : ""}`}
+              className={`acw-obj${m.objective === o ? " on" : ""}`}
               disabled={api.busy}
               onClick={() => api.update({ objective: o })}
             >
-              {OBJECTIVE_LABEL[o]}
+              <ObjectiveIcon objective={o} />
+              <span className="acw-obj-text">
+                <span className="acw-obj-label">{OBJECTIVE_LABEL[o]}</span>
+                <span className="acw-obj-desc">{OBJECTIVE_DESC[o]}</span>
+              </span>
             </button>
           ))}
         </div>
       </Field>
 
-      {/* Locations first — geo is the key lever for local SMB. */}
+      {/* Audience-building method — Advantage+ vs manual (Meta's two top modes). */}
+      <Field label="Метод подбора аудитории">
+        <Segmented
+          value={m.audience_mode}
+          onChange={(v) => api.update({ audience_mode: v })}
+          disabled={api.busy}
+          options={[
+            { value: "advantage", label: "Advantage+ (ИИ Meta)" },
+            { value: "manual", label: "Ручная настройка" },
+          ]}
+        />
+        <div className="acw-hint">
+          {advantage
+            ? "Meta использует данные оператора (Custom Audience) и ваши подсказки (гео, возраст, интересы), чтобы найти больше похожих покупателей."
+            : "Вы полностью управляете таргетингом: источник, гео, возраст, интересы и плейсменты."}
+        </div>
+        <AudienceGauge reach={draft.audience_reach || 0} />
+      </Field>
+
+      {/* Audience source — operator Custom Audience seed + optional Lookalike. */}
+      <Field label="Источник аудитории">
+        <div className="acw-source-card">
+          <span className="acw-source-tag">Custom Audience</span>
+          <span>Данные оператора · совпадение ≈ 60% · ≈ {reach} профилей</span>
+        </div>
+        {advantage ? (
+          <div className="acw-hint">Lookalike-моделирование встроено в Advantage+ — Meta сама расширит аудиторию.</div>
+        ) : (
+          <>
+            <div className="acw-toggle-row">
+              <span>Похожая аудитория (Lookalike)</span>
+              <Toggle on={m.lookalike} onClick={() => api.update({ lookalike: !m.lookalike })} disabled={api.busy} />
+            </div>
+            {m.lookalike && (
+              <div className="acw-look">
+                <input
+                  type="range" min={1} max={10} step={1} value={m.lookalike_pct}
+                  className="acw-range" disabled={api.busy}
+                  onChange={(e) => api.update({ lookalike_pct: Number(e.target.value) })}
+                />
+                <div className="acw-look-ends">
+                  <span>1% — ближе к источнику</span>
+                  <span className="acw-look-val">{m.lookalike_pct}%</span>
+                  <span>10% — шире охват</span>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </Field>
+
+      {/* Locations — a *hard control* even under Advantage+; geo first for local SMB. */}
       <div className="acw-geo">
-        <Field label="Локации">
+        <Field label="Локации" badge="Жёсткое условие">
           <EditableChips
             items={s.geography}
             empty="Город или регион (можно радиус вокруг точки)"
@@ -456,7 +591,7 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
         </Field>
       </div>
 
-      <Field label="Возраст и пол">
+      <Field label="Возраст и пол" hint={suggestHint}>
         <GenderRadios value={s.demographics} onChange={(v) => api.update({ demographics: v })} disabled={api.busy} />
         <div className="acw-sub-field">
           <EditableChips
@@ -470,7 +605,7 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
         </div>
       </Field>
 
-      <Field label="Детальный таргетинг">
+      <Field label="Детальный таргетинг" hint={suggestHint}>
         <EditableChips
           items={s.interests}
           labelMap={INTEREST_LABEL}
@@ -482,25 +617,27 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
         />
       </Field>
 
-      <Field label="Источник аудитории">
-        <div className="acw-meta-audience">Custom Audience (данные оператора) · совпадение ≈ 60% · ≈ {reach} профилей</div>
-        <div className="acw-toggle-row">
-          <span>Похожая аудитория (lookalike)</span>
-          <Toggle on={draft.meta.lookalike} onClick={() => api.update({ lookalike: !draft.meta.lookalike })} disabled={api.busy} />
-        </div>
-      </Field>
-
+      {/* Placements — Advantage+ (auto) by default, switchable to manual. */}
       <Field label="Плейсменты">
-        <div className="acw-hint">Нажмите, чтобы включить или выключить площадку.</div>
+        <div className="acw-toggle-row">
+          <span>Автоматические плейсменты (Advantage+)</span>
+          <Toggle on={m.advantage_placements} onClick={() => api.update({ advantage_placements: !m.advantage_placements })} disabled={api.busy} />
+        </div>
+        <div className="acw-hint">
+          {m.advantage_placements
+            ? "Meta сама распределит показы по площадкам для лучшего результата (рекомендуется)."
+            : "Выберите площадки вручную — нажмите, чтобы включить или выключить."}
+        </div>
         <div className="acw-chips">
           {ALL_PLACEMENTS.map((p) => {
             const on = draft.meta.placements.includes(p);
+            const auto = m.advantage_placements;
             return (
               <button
                 key={p}
                 type="button"
-                className={`acw-chip acw-chip-btn${on ? " acw-chip-accent" : " acw-chip-off"}`}
-                disabled={api.busy}
+                className={`acw-chip acw-chip-btn${(auto || on) ? " acw-chip-accent" : " acw-chip-off"}`}
+                disabled={api.busy || auto}
                 onClick={() => api.update({ toggle_placement: p })}
               >
                 <PlatformIcon platform={p} />{PLACEMENT_LABEL[p]}
@@ -576,27 +713,29 @@ function SegmentsStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) 
 
 function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   const { generateCreative, uploadCreative } = useChatWorkspaceStore();
-  const [busy, setBusy] = useState(false);
+  const [busyKind, setBusyKind] = useState<"image" | "video" | "upload" | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const creative = draft.meta.creative;
-  const formats = availableFormats(draft.meta.placements);
+  // Under Advantage+ placements Meta runs across all platforms → offer all formats.
+  const places = draft.meta.advantage_placements ? ALL_PLACEMENTS : draft.meta.placements;
+  const formats = availableFormats(places);
   const headline = draft.message.text || draft.meta.creative.headline || draft.goal;
   const vertical = FORMAT_META[creative.format]?.ratio === "9:16";
 
   const gen = async (media_type: MediaType) => {
-    setBusy(true);
+    setBusyKind(media_type === "video" ? "video" : "image");
     try { await generateCreative({ format: creative.format, media_type, headline }); }
-    finally { setBusy(false); }
+    finally { setBusyKind(null); }
   };
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    setBusy(true);
-    try { await uploadCreative(file); } finally { setBusy(false); }
+    setBusyKind("upload");
+    try { await uploadCreative(file); } finally { setBusyKind(null); }
   };
 
-  const disabled = api.busy || busy;
+  const disabled = api.busy || busyKind !== null;
   return (
     <>
       <Field label="Формат размещения">
@@ -634,14 +773,14 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
       <div className="acw-creative-grid">
         <Field label="Медиа">
           <div className="acw-media-actions">
-            <button type="button" className="acw-btn acw-btn-ghost" disabled={disabled} onClick={() => gen("image")}>
-              {busy ? "…" : "✦ Сгенерировать фото"}
+            <button type="button" className="acw-btn acw-btn-ghost acw-media-btn" disabled={disabled} onClick={() => gen("image")}>
+              {busyKind === "image" ? <Spinner /> : <IconPhoto />}Сгенерировать фото
             </button>
-            <button type="button" className="acw-btn acw-btn-ghost" disabled={disabled} onClick={() => gen("video")}>
-              {busy ? "…" : "✦ Сгенерировать видео"}
+            <button type="button" className="acw-btn acw-btn-ghost acw-media-btn" disabled={disabled} onClick={() => gen("video")}>
+              {busyKind === "video" ? <Spinner /> : <IconVideo />}Сгенерировать видео
             </button>
-            <button type="button" className="acw-btn acw-btn-ghost" disabled={disabled} onClick={() => fileRef.current?.click()}>
-              ⭱ Загрузить файл
+            <button type="button" className="acw-btn acw-btn-ghost acw-media-btn" disabled={disabled} onClick={() => fileRef.current?.click()}>
+              {busyKind === "upload" ? <Spinner /> : <IconUpload />}Загрузить файл
             </button>
             <input ref={fileRef} type="file" accept="image/*,video/*" hidden onChange={onFile} />
           </div>

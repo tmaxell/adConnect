@@ -69,9 +69,12 @@ def test_meta_uses_cpm_not_price_per_message():
 
 def test_meta_audience_capped_by_match_rate():
     # Same targeting on SMS vs Meta: Meta reach is smaller (Custom Audience match).
+    # Manual mode isolates the seed match (no Advantage+/Lookalike expansion).
     seg = SegmentSpec(geography=["Moscow"], interests=["sport"])
     sms = estimate(CampaignDraft(channel="sms", segments=seg))
-    meta = estimate(CampaignDraft(channel="meta", segments=seg))
+    meta_draft = CampaignDraft(channel="meta", segments=seg)
+    meta_draft.meta.audience_mode = "manual"
+    meta = estimate(meta_draft)
     assert meta.audience_reach < sms.audience_reach
     # Meta reach ≈ SMS reach × match rate (Custom Audience match).
     ratio = meta.audience_reach / sms.audience_reach
@@ -81,6 +84,7 @@ def test_meta_audience_capped_by_match_rate():
 def test_meta_platform_breakdown_splits_impressions():
     from tools.forecast import apply_forecast
     draft = CampaignDraft(channel="meta", segments=SegmentSpec(interests=["sport"]))
+    draft.meta.advantage_placements = False  # manual placements
     draft.meta.placements = ["facebook", "instagram"]
     draft.cost.budget = 60_000
     apply_forecast(draft)
