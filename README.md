@@ -23,6 +23,15 @@ The backend runs in **deterministic mode** without an LLM key. To enable the LLM
 create `backend/.env` from `backend/.env.example` and add a provider key — compose
 loads it automatically.
 
+> **After changing code, always rebuild** — `docker compose up -d` (without
+> `--build`) reuses the existing images, so the UI/API can look stale:
+> ```bash
+> docker compose up -d --build            # rebuild both
+> docker compose up -d --build frontend   # rebuild just the frontend
+> ```
+> Asset filenames are content-hashed, so a normal browser refresh of
+> `http://localhost:8080` picks up the new build (no hard-reload needed).
+
 ## Run locally (dev)
 
 ```bash
