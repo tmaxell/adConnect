@@ -437,12 +437,6 @@
 .acw-meta-k { font-size: 13px; color: var(--ac-text-secondary); min-width: 96px; }
 .acw-chip-off { color: var(--ac-text-muted); background: #f8fafc; border: 1px dashed var(--ac-border); }
 
-.acw-analytics { border: 1px solid var(--ac-border); border-radius: 8px; overflow: hidden; }
-.acw-analytics-row { display: grid; grid-template-columns: 1.5fr 0.9fr 0.9fr 0.6fr 0.7fr 0.6fr; gap: 8px; padding: 8px 12px; font-size: 13px; border-bottom: 1px solid var(--ac-border-soft); }
-.acw-analytics-row span:not(:first-child) { text-align: right; color: var(--ac-text); }
-.acw-analytics-head { background: var(--ac-surface-2, #f8fafc); color: var(--ac-text-secondary); font-weight: 600; }
-.acw-analytics-note { padding: 8px 12px; font-size: 12px; color: var(--ac-text-muted); }
-
 /* Meta visual polish */
 .acw-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
 .acw-platform-name { display: inline-flex; align-items: center; }
@@ -454,3 +448,81 @@
 /* Geo highlighted as the primary lever in the Meta audience builder */
 .acw-geo { background: #f7f8ff; border: 1px solid #e3e6ff; border-radius: 10px; padding: 12px 14px; }
 .acw-geo .acw-field { gap: 6px; }
+
+/* ── Interactive (clickable canvas) ──────────────────────────────────────────── */
+/* Reset button styling so step/channel/chip buttons inherit the mock look. */
+.acw-step, .acw-chan, .acw-radio-row, .acw-chip-btn, .acw-format, .acw-variant {
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.acw-step { background: none; border: 0; padding: 0; }
+.acw-step:disabled, .acw-chan:disabled, .acw-chip-btn:disabled,
+.acw-format:disabled, .acw-radio-row:disabled, .acw-variant:disabled,
+.acw-btn:disabled { cursor: default; opacity: 0.6; }
+.acw-chan { width: 100%; background: var(--ac-surface); cursor: pointer; transition: border-color .12s, box-shadow .12s; }
+.acw-chan:not(:disabled):hover { border-color: var(--ac-accent); }
+.acw-chan.planned { cursor: default; }
+.acw-radio-row { background: none; border: 0; padding: 0; }
+.acw-chip-btn { border: 0; cursor: pointer; transition: background .12s, color .12s; }
+.acw-chip-btn:not(:disabled):hover { filter: brightness(0.97); }
+
+/* Editable chips */
+.acw-edit-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.acw-chip-edit { display: inline-flex; align-items: center; gap: 6px; color: var(--ac-accent); background: var(--ac-accent-soft); }
+.acw-chip-x { border: 0; background: none; color: inherit; cursor: pointer; font-size: 15px; line-height: 1; padding: 0; opacity: 0.7; }
+.acw-chip-x:hover { opacity: 1; }
+.acw-chip-input { border: 1px dashed var(--ac-border); border-radius: 999px; padding: 4px 12px; font-size: 13px; min-width: 110px; outline: none; }
+.acw-chip-input:focus { border-color: var(--ac-accent); border-style: solid; }
+
+/* Editable text / number inputs */
+.acw-input-edit-wrap { position: relative; }
+.acw-input-edit, .acw-textarea-edit {
+  width: 100%; border: 1px solid var(--ac-border); border-radius: 8px;
+  padding: 10px 12px; font: inherit; font-size: 14px; outline: none; background: var(--ac-surface);
+}
+.acw-input-edit:focus, .acw-textarea-edit:focus { border-color: var(--ac-accent); box-shadow: 0 0 0 1px var(--ac-accent); }
+.acw-textarea-edit { min-height: 64px; resize: vertical; }
+.acw-input-suffix { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--ac-text-muted); font-size: 14px; pointer-events: none; }
+
+/* Create-campaign button on the campaigns screen */
+.ac-card-head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.ac-create-btn { flex-shrink: 0; border: 0; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; color: #fff; background: var(--ac-accent); cursor: pointer; }
+.ac-create-btn:hover { filter: brightness(1.05); }
+
+/* ── Meta creative step ──────────────────────────────────────────────────────── */
+.acw-formats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.acw-format {
+  display: flex; flex-direction: column; gap: 2px;
+  border: 1px solid var(--ac-border); border-radius: 10px; padding: 12px; background: var(--ac-surface);
+  transition: border-color .12s, box-shadow .12s;
+}
+.acw-format:not(:disabled):hover { border-color: var(--ac-accent); }
+.acw-format.on { border-color: var(--ac-accent); box-shadow: 0 0 0 1px var(--ac-accent); background: var(--ac-accent-soft); }
+.acw-format-label { font-size: 14px; font-weight: 600; }
+.acw-format-ratio { font-size: 12px; font-weight: 600; color: var(--ac-accent); }
+.acw-format-hint { font-size: 12px; color: var(--ac-text-secondary); }
+
+.acw-creative-grid { display: grid; grid-template-columns: 1fr 240px; gap: 18px; align-items: start; }
+.acw-media-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.acw-media-meta { font-size: 12px; color: var(--ac-text-secondary); margin-top: 10px; }
+
+/* Ad preview mockup */
+.acw-adpreview { border: 1px solid var(--ac-border); border-radius: 12px; overflow: hidden; background: var(--ac-surface); }
+.acw-adpreview-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; }
+.acw-adpreview-avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #a855f7); flex-shrink: 0; }
+.acw-adpreview-brand { font-size: 13px; font-weight: 600; }
+.acw-adpreview-sponsored { margin-left: auto; font-size: 11px; color: var(--ac-text-muted); }
+.acw-adpreview-media { position: relative; aspect-ratio: 1 / 1; background: #eef2f7; display: flex; align-items: center; justify-content: center; }
+.acw-adpreview.vertical .acw-adpreview-media { aspect-ratio: 9 / 16; }
+.acw-adpreview-asset { width: 100%; height: 100%; object-fit: cover; display: block; }
+.acw-adpreview-empty { color: var(--ac-text-muted); font-size: 14px; font-weight: 600; }
+.acw-adpreview-overlay { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 12px; font-size: 13px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.55)); }
+.acw-adpreview-cta { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: #f1f5f9; font-size: 13px; font-weight: 600; color: var(--ac-accent); }
+
+/* Confirmation creative thumbnail */
+.acw-confirm-creative { display: flex; gap: 12px; align-items: center; }
+.acw-confirm-thumb { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; border: 1px solid var(--ac-border); }
+.acw-confirm-creative-meta { font-size: 13px; }
+
+@media (max-width: 880px) {
+  .acw-creative-grid { grid-template-columns: 1fr; }
+}

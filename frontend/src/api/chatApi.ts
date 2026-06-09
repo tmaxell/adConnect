@@ -3,6 +3,8 @@
  * Все взаимодействия с агентами идут через POST /api/chat (intent routing на бэкенде).
  */
 
+import type { CampaignDraft } from "../types/campaign";
+
 export interface ChatSession {
   id: string;
   title: string;
@@ -242,6 +244,73 @@ export async function sendChat(sessionId: string, message: string, action?: Chat
     artifacts: Array.isArray(o.artifacts) ? o.artifacts.map(normalizeArtifact) : [],
     actions_available: normalizeActions(o.actions_available),
     session_id: asString(o.session_id, sessionId),
+  };
+}
+
+// ── Interactive draft (clickable canvas) ─────────────────────────────────────
+// The canvas mutates the same `campaign_draft` artifact as the chat agent, so the
+// user can build a campaign by clicking — not only by talking to the copilot.
+
+/** Apply a small patch (a channel pick, placement toggle, budget…) to the draft. */
+export async function patchDraft(
+  sessionId: string,
+  patch: Record<string, unknown>,
+): Promise<CampaignDraft> {
+  const data = await http<unknown>(`/api/sessions/${encodeURIComponent(sessionId)}/draft`, {
+    method: "PATCH",
+    body: JSON.stringify({ patch }),
+  });
+  const o = isObject(data) ? data : {};
+  return o.draft as CampaignDraft;
+}
+
+export interface CreativeResult {
+  url: string;
+  media_type: "image" | "video";
+  draft: CampaignDraft;
+}
+
+/** Mock-generate a creative for the given format → returns a placeholder asset URL. */
+export async function generateCreative(
+  sessionId: string,
+  params: { format: string; media_type: "image" | "video"; headline?: string | null },
+): Promise<CreativeResult> {
+  const data = await http<unknown>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/creative/generate`,
+    { method: "POST", body: JSON.stringify(params) },
+  );
+  const o = isObject(data) ? data : {};
+  return {
+    url: asString(o.url),
+    media_type: o.media_type === "video" ? "video" : "image",
+    draft: o.draft as CampaignDraft,
+  };
+}
+
+/** Upload a real image/video file → attaches it to the draft's Meta creative. */
+export async function uploadCreative(sessionId: string, file: File): Promise<CreativeResult> {
+  const form = new FormData();
+  form.append("file", file);
+  // Bypass http() — it forces JSON content-type; FormData sets its own boundary.
+  const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/creative/upload`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    throw new ChatApiError(
+      res.status === 413 ? "Файл слишком большой (макс. 25 МБ)"
+        : res.status === 415 ? "Поддерживаются только изображения или видео"
+        : `Не удалось загрузить файл (${res.status})`,
+      res.status,
+      res.status >= 500,
+    );
+  }
+  const raw = await res.json();
+  const o = isObject(raw) ? raw : {};
+  return {
+    url: asString(o.url),
+    media_type: o.media_type === "video" ? "video" : "image",
+    draft: o.draft as CampaignDraft,
   };
 }
 

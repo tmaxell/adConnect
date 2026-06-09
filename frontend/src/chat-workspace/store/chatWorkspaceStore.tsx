@@ -2,16 +2,20 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import {
   ChatApiError,
   createChat,
+  generateCreative,
   getChat,
   listChats,
+  patchDraft,
   sendChat,
+  uploadCreative,
   type ChatAction,
   type ChatArtifact,
   type ChatMessage,
   type ChatSession,
+  type CreativeResult,
 } from "../../api/chatApi";
 import type { CampaignFlow } from "../../types/api";
-import type { CampaignDraft } from "../../types/campaign";
+import type { CampaignDraft, MetaFormat, MediaType } from "../../types/campaign";
 import { normalizeUpsellFlow } from "../../components/flow/normalizeUpsellFlow";
 
 export interface ChatEntry extends ChatMessage {
@@ -25,6 +29,9 @@ interface ChatWorkspaceState {
   artifacts: ChatArtifact[];
   draftFlow: CampaignFlow | null;
   campaignDraft: CampaignDraft | null;
+  /** Bumps only on agent/session-driven draft changes (not local canvas edits),
+   *  so the wizard can follow the agent without yanking the view during clicks. */
+  draftRev: number;
   loadingSessions: boolean;
   loadingMessages: boolean;
   sending: boolean;
@@ -33,6 +40,10 @@ interface ChatWorkspaceState {
   createNewChat: () => Promise<string>;
   sendMessage: (content: string, action?: ChatAction) => Promise<void>;
   refreshSessions: () => Promise<void>;
+  /** Clickable canvas: apply a patch to the draft (creates a session if needed). */
+  updateDraft: (patch: Record<string, unknown>) => Promise<void>;
+  generateCreative: (params: { format: MetaFormat; media_type: MediaType; headline?: string | null }) => Promise<CreativeResult | null>;
+  uploadCreative: (file: File) => Promise<CreativeResult | null>;
 }
 
 const ChatWorkspaceContext = createContext<ChatWorkspaceState | null>(null);
@@ -103,7 +114,9 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draftRev, setDraftRev] = useState(0);
   const userActedRef = useRef(false);
+  const bumpDraft = useCallback(() => setDraftRev((r) => r + 1), []);
 
   const refreshSessions = useCallback(async (silent = false) => {
     setLoadingSessions(true);
@@ -155,6 +168,7 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
       const detail = await getChat(sessionId);
       setMessages(detail.messages.map((m) => ({ ...m })));
       setArtifacts(detail.artifacts);
+      bumpDraft();
     } catch (e) {
       setError(toError(e));
       setMessages([]);
@@ -162,7 +176,7 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoadingMessages(false);
     }
-  }, []);
+  }, [bumpDraft]);
 
   // Авто-выбор самой свежей сессии на старте. Раньше история подтягивалась
   // только после первого отправленного сообщения — при перезаходе на страницу
@@ -184,12 +198,13 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
       setActiveSessionId(session.id);
       setMessages([]);
       setArtifacts([]);
+      bumpDraft();
       return session.id;
     } catch (e) {
       setError(toError(e));
       throw e;
     }
-  }, []);
+  }, [bumpDraft]);
 
   const sendMessage = useCallback(
     async (content: string, action?: ChatAction) => {
@@ -236,6 +251,7 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
           const detail = await getChat(sessionId);
           setMessages(detail.messages.map((m) => ({ ...m })));
           setArtifacts(detail.artifacts);
+          bumpDraft();
         } catch {
           // если перезагрузка не удалась — оставляем оптимистичный state
         }
@@ -247,7 +263,75 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
         setSending(false);
       }
     },
-    [activeSessionId, createNewChat, refreshSessions],
+    [activeSessionId, createNewChat, refreshSessions, bumpDraft],
+  );
+
+  // Upsert the canvas-edited draft as the latest campaign_draft artifact so the
+  // wizard re-renders immediately (extractCampaignDraft returns the last match).
+  const mergeDraftArtifact = useCallback((draft: CampaignDraft) => {
+    setArtifacts((prev) => {
+      const kept = prev.filter((a) => a.id !== "canvas-draft");
+      return [...kept, {
+        id: "canvas-draft",
+        type: "campaign_draft",
+        title: null,
+        content: draft as unknown as Record<string, unknown>,
+        metadata: {},
+      }];
+    });
+  }, []);
+
+  const updateDraft = useCallback(
+    async (patch: Record<string, unknown>) => {
+      let sessionId = activeSessionId;
+      if (!sessionId) sessionId = await createNewChat();
+      userActedRef.current = true;
+      try {
+        const draft = await patchDraft(sessionId, patch);
+        mergeDraftArtifact(draft);
+      } catch (e) {
+        setError(toError(e));
+      }
+    },
+    [activeSessionId, createNewChat, mergeDraftArtifact],
+  );
+
+  const generateCreativeAction = useCallback(
+    async (params: { format: MetaFormat; media_type: MediaType; headline?: string | null }) => {
+      let sessionId = activeSessionId;
+      if (!sessionId) sessionId = await createNewChat();
+      userActedRef.current = true;
+      try {
+        const result = await generateCreative(sessionId, {
+          format: params.format,
+          media_type: params.media_type === "video" ? "video" : "image",
+          headline: params.headline ?? null,
+        });
+        mergeDraftArtifact(result.draft);
+        return result;
+      } catch (e) {
+        setError(toError(e));
+        return null;
+      }
+    },
+    [activeSessionId, createNewChat, mergeDraftArtifact],
+  );
+
+  const uploadCreativeAction = useCallback(
+    async (file: File) => {
+      let sessionId = activeSessionId;
+      if (!sessionId) sessionId = await createNewChat();
+      userActedRef.current = true;
+      try {
+        const result = await uploadCreative(sessionId, file);
+        mergeDraftArtifact(result.draft);
+        return result;
+      } catch (e) {
+        setError(toError(e));
+        return null;
+      }
+    },
+    [activeSessionId, createNewChat, mergeDraftArtifact],
   );
 
   const draftFlow = useMemo(() => extractDraftFlow(artifacts), [artifacts]);
@@ -261,6 +345,7 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
       artifacts,
       draftFlow,
       campaignDraft,
+      draftRev,
       loadingSessions,
       loadingMessages,
       sending,
@@ -269,6 +354,9 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
       createNewChat,
       sendMessage,
       refreshSessions,
+      updateDraft,
+      generateCreative: generateCreativeAction,
+      uploadCreative: uploadCreativeAction,
     }),
     [
       sessions,
@@ -277,6 +365,7 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
       artifacts,
       draftFlow,
       campaignDraft,
+      draftRev,
       loadingSessions,
       loadingMessages,
       sending,
@@ -285,6 +374,9 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
       createNewChat,
       sendMessage,
       refreshSessions,
+      updateDraft,
+      generateCreativeAction,
+      uploadCreativeAction,
     ],
   );
 

@@ -310,14 +310,22 @@ function AdcCampaignsScreen() {
     return () => { cancelled = true; };
   }, []);
 
+  const { updateDraft } = useChatWorkspaceStore();
   const list = rows ?? CAMPAIGNS;
   return (
     <div className="ac-card">
       <div className="ac-card-head">
-        <h1 className="ac-card-title">Advertising campaigns</h1>
-        <p className="ac-card-subtitle">
-          You can create an advertising campaign, view existing ones with their data, or delete them
-        </p>
+        <div className="ac-card-head-row">
+          <div>
+            <h1 className="ac-card-title">Advertising campaigns</h1>
+            <p className="ac-card-subtitle">
+              You can create an advertising campaign, view existing ones with their data, or delete them
+            </p>
+          </div>
+          <button type="button" className="ac-create-btn" onClick={() => void updateDraft({})}>
+            + Создать кампанию
+          </button>
+        </div>
       </div>
 
       <div className="ac-toolbar">

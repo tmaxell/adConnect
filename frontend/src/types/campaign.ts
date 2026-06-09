@@ -39,11 +39,24 @@ export interface MessageSpec {
 
 export type MetaObjective = "awareness" | "traffic" | "engagement" | "leads" | "sales";
 
+/** Ad creative format (placement position / Click-to-WhatsApp destination). */
+export type MetaFormat = "feed" | "stories" | "reels" | "whatsapp";
+export type MediaType = "none" | "image" | "video";
+
+export interface MetaCreative {
+  format: MetaFormat;
+  media_type: MediaType;
+  media_url: string | null;
+  media_source: "upload" | "generated" | null;
+  headline: string | null;
+}
+
 export interface MetaSpec {
   objective: MetaObjective;
   placements: string[];
   lookalike: boolean;
   optimization_goal: string;
+  creative: MetaCreative;
 }
 
 export interface PlatformStat {
