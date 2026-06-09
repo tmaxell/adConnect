@@ -46,7 +46,7 @@ cd frontend && npm install && npm run dev   # http://localhost:5173 (proxies /ap
 ## Test
 
 ```bash
-cd backend && source .venv/bin/activate && pytest    # 26 tests
+cd backend && source .venv/bin/activate && pytest    # 45 tests
 ```
 
 ## Try it (SMB scenarios)
@@ -58,3 +58,10 @@ The agent is tuned for general small-business advertisers. Example prompts:
 - "Собери кампанию по продвижению автосервиса"
 
 As you converse, the product canvas fills the campaign wizard live, step by step.
+
+The canvas is also **fully clickable** — you can build a campaign without the copilot:
+pick a channel, toggle placements, edit the audience, and on the Meta **creative**
+step choose a placement format (Лента / Истории / Reels / Click-to-WhatsApp) and
+generate or upload an image/video, with a live ad preview. The canvas and the agent
+edit the same draft. See `docs/creative_generation_and_backend.md` for the Meta
+creative-API research, the interactive endpoints, and the production-scaling sketch.
