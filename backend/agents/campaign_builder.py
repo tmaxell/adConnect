@@ -29,7 +29,7 @@ from schemas import CampaignDraft, ChatAction
 from tools import creatives as creatives_tool
 from tools import naming
 from tools.brief import merge_updates, update_draft_from_message
-from tools.catalog import CHANNELS, SEGMENTS_BY_ID, match_segments
+from tools.catalog import CHANNELS, SEGMENTS_BY_ID, is_network_channel, match_segments
 from tools.forecast import apply_forecast
 
 logger = logging.getLogger(__name__)
@@ -96,7 +96,7 @@ async def _handle_action(ctx: AgentContext, draft: CampaignDraft, action_id: str
     payload = (ctx.action.payload if ctx.action else {}) or {}
 
     if action_id == "select_channel":
-        if payload.get("channel") in ("sms", "email"):
+        if payload.get("channel") in ("sms", "email", "meta"):
             draft.channel = payload["channel"]
         return None
 
@@ -169,7 +169,8 @@ async def _generate_creatives(ctx: AgentContext, draft: CampaignDraft) -> AgentR
     draft.message.variants = variants
     await ctx.emit("tool_called", detail=f"generate_creatives → {len(variants)} variant(s)")
 
-    lines = [f"Сгенерировал варианты {CHANNELS[channel].label}-сообщения:\n"]
+    noun = "объявления" if is_network_channel(channel) else "сообщения"
+    lines = [f"Сгенерировал варианты {CHANNELS[channel].label} — {noun}:\n"]
     actions: list[ChatAction] = []
     for i, v in enumerate(variants):
         lines.append(f"{i + 1}. {v}")
@@ -246,21 +247,32 @@ def _wrap(draft: CampaignDraft, message: str, actions: list[ChatAction], *,
 
 
 def _ask_channel(draft: CampaignDraft) -> AgentResult:
+    meta = CHANNELS["meta"]
     msg = (
-        f"{_intro_line(draft)}Начнём с **канала отправки**. Через что отправляем рекламу — SMS или Email?\n\n"
+        f"{_intro_line(draft)}Начнём с **канала**. Где показываем рекламу?\n\n"
         f"- **SMS** — мгновенный контакт, {CHANNELS['sms'].base_price_per_message} ₽/сообщение.\n"
-        f"- **Email** — для длинных сообщений, {CHANNELS['email'].base_price_per_message} ₽/сообщение."
+        f"- **Email** — для длинных сообщений, {CHANNELS['email'].base_price_per_message} ₽/сообщение.\n"
+        f"- **Meta Ads** — Facebook, Instagram и WhatsApp. Ваша аудитория загружается как "
+        f"Custom Audience (по хешам телефонов), оплата за показы (CPM ≈ {meta.avg_cpm:.0f} ₽)."
     )
     actions = [
         ChatAction(id="select_channel", label="SMS", kind="primary", payload={"channel": "sms"}),
         ChatAction(id="select_channel", label="Email", kind="primary", payload={"channel": "email"}),
+        ChatAction(id="select_channel", label="Meta Ads", kind="primary", payload={"channel": "meta"}),
     ]
     return _wrap(draft, msg, actions)
 
 
 def _ask_segments(draft: CampaignDraft) -> AgentResult:
+    landing = ""
+    if is_network_channel(draft.channel):
+        ci = CHANNELS[draft.channel]
+        landing = (
+            f" Для **{ci.label}** аудитория загружается как Custom Audience "
+            f"(хеши телефонов, совпадает ≈{ci.match_rate * 100:.0f}%)."
+        )
     msg = (
-        f"Канал: **{CHANNELS[draft.channel].label}**. Теперь — **аудитория**.\n\n"
+        f"Канал: **{CHANNELS[draft.channel].label}**. Теперь — **аудитория**.{landing}\n\n"
         f"Опишите, кого хотим охватить (гео, возраст, интересы), либо я подберу сегмент "
         f"абонентской базы под вашу цель."
     )
@@ -270,9 +282,16 @@ def _ask_segments(draft: CampaignDraft) -> AgentResult:
 
 def _ask_message(draft: CampaignDraft) -> AgentResult:
     reach = f"{draft.audience_reach:,}".replace(",", " ")
+    if is_network_channel(draft.channel):
+        ci = CHANNELS[draft.channel]
+        price_line = f"охват аудитории ≈ **{reach}**, размещение **{', '.join(ci.placements)}**, оплата за показы (CPM ≈ {draft.cpm:.0f} ₽)"
+        what = "**текст объявления**"
+    else:
+        price_line = f"охват ≈ **{reach}**, цена сообщения **{draft.price_per_message} ₽**"
+        what = "**текст сообщения**"
     msg = (
-        f"Аудитория готова: охват ≈ **{reach}**, цена сообщения **{draft.price_per_message} ₽**.\n\n"
-        f"Теперь **текст сообщения**. Пришлите свой вариант или я сгенерирую несколько под вашу цель."
+        f"Аудитория готова: {price_line}.\n\n"
+        f"Теперь {what}. Пришлите свой вариант или я сгенерирую несколько под вашу цель."
     )
     actions = [
         ChatAction(id="generate_creatives", label="Сгенерировать креативы", kind="primary", payload={}),
@@ -282,11 +301,18 @@ def _ask_message(draft: CampaignDraft) -> AgentResult:
 
 
 def _ask_cost(draft: CampaignDraft) -> AgentResult:
-    msg = (
-        "Сообщение готово. Теперь — **бюджет**.\n\n"
-        f"Укажите бюджет в рублях или число сообщений. При цене **{draft.price_per_message} ₽** "
-        f"за сообщение я посчитаю охват и стоимость."
-    )
+    if is_network_channel(draft.channel):
+        msg = (
+            "Объявление готово. Теперь — **бюджет**.\n\n"
+            f"Укажите бюджет кампании в рублях. При CPM **{draft.cpm:.0f} ₽** я посчитаю "
+            f"ожидаемое число показов."
+        )
+    else:
+        msg = (
+            "Сообщение готово. Теперь — **бюджет**.\n\n"
+            f"Укажите бюджет в рублях или число сообщений. При цене **{draft.price_per_message} ₽** "
+            f"за сообщение я посчитаю охват и стоимость."
+        )
     return _wrap(draft, msg, [])
 
 
@@ -314,6 +340,7 @@ def _intro_line(draft: CampaignDraft) -> str:
 def _summary(draft: CampaignDraft) -> str:
     seg = draft.segments
     reach = f"{draft.audience_reach:,}".replace(",", " ")
+    network = is_network_channel(draft.channel)
     rows = [
         f"- **Канал**: {CHANNELS[draft.channel].label if draft.channel else '—'}",
         f"- **Аудитория**: {seg.matched_segment_name or _audience_text(draft)}",
@@ -321,11 +348,24 @@ def _summary(draft: CampaignDraft) -> str:
         f"- **Демография**: {seg.demographics}",
         f"- **Возраст**: {', '.join(seg.age) or '—'}",
         f"- **Интересы**: {', '.join(seg.interests) or '—'}",
-        f"- **Сообщение**: {draft.message.text or '—'}",
-        f"- **Охват**: ≈ {reach}",
-        f"- **Цена сообщения**: {draft.price_per_message} ₽",
-        f"- **Бюджет**: {_budget_text(draft)}",
+        f"- **{'Объявление' if network else 'Сообщение'}**: {draft.message.text or '—'}",
     ]
+    if network:
+        ci = CHANNELS[draft.channel]
+        impressions = f"{draft.estimated_impressions:,}".replace(",", " ")
+        rows += [
+            f"- **Размещение**: {', '.join(ci.placements)}",
+            f"- **Аудитория (Custom Audience)**: ≈ {reach}",
+            f"- **CPM**: {draft.cpm:.0f} ₽",
+            f"- **Ожидаемые показы**: ≈ {impressions}",
+            f"- **Бюджет**: {_budget_text(draft)}",
+        ]
+    else:
+        rows += [
+            f"- **Охват**: ≈ {reach}",
+            f"- **Цена сообщения**: {draft.price_per_message} ₽",
+            f"- **Бюджет**: {_budget_text(draft)}",
+        ]
     return "\n".join(rows)
 
 

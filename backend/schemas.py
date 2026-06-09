@@ -50,7 +50,7 @@ class ChatArtifact(BaseModel):
 WizardStep = Literal["channel", "segments", "message", "cost", "confirmation", "ready"]
 WIZARD_STEPS: tuple[WizardStep, ...] = ("channel", "segments", "message", "cost", "confirmation")
 
-Channel = Literal["sms", "email"]
+Channel = Literal["sms", "email", "meta"]
 Demographics = Literal["all", "men", "women"]
 
 
@@ -129,8 +129,10 @@ class CampaignDraft(BaseModel):
     cost: CostSpec = Field(default_factory=CostSpec)
 
     audience_reach: int = 0
-    price_per_message: float = 0.0
+    price_per_message: float = 0.0        # messaging channels (SMS/Email)
     estimated_cost: float = 0.0
+    cpm: float = 0.0                       # network channels (Meta): ₽ per 1000 impressions
+    estimated_impressions: int = 0         # network channels: budget ÷ CPM × 1000
 
     status: Literal["draft", "submitted"] = "draft"
     step: WizardStep = "channel"

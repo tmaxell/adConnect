@@ -52,3 +52,27 @@ def test_email_is_cheaper_than_sms():
     sms = estimate(CampaignDraft(channel="sms"))
     email = estimate(CampaignDraft(channel="email"))
     assert email.price_per_message < sms.price_per_message
+
+
+# ── Meta (network channel) ────────────────────────────────────────────────────
+
+def test_meta_uses_cpm_not_price_per_message():
+    draft = CampaignDraft(channel="meta")
+    draft.cost.budget = 30_000
+    f = estimate(draft)
+    assert f.price_per_message == 0.0
+    assert f.cpm == CHANNELS["meta"].avg_cpm
+    # impressions = budget / cpm * 1000
+    assert f.estimated_impressions == int(30_000 / CHANNELS["meta"].avg_cpm * 1000)
+    assert f.estimated_cost == 30_000
+
+
+def test_meta_audience_capped_by_match_rate():
+    # Same targeting on SMS vs Meta: Meta reach is smaller (Custom Audience match).
+    seg = SegmentSpec(geography=["Moscow"], interests=["sport"])
+    sms = estimate(CampaignDraft(channel="sms", segments=seg))
+    meta = estimate(CampaignDraft(channel="meta", segments=seg))
+    assert meta.audience_reach < sms.audience_reach
+    # Meta reach ≈ SMS reach × match rate (Custom Audience match).
+    ratio = meta.audience_reach / sms.audience_reach
+    assert abs(ratio - CHANNELS["meta"].match_rate) < 0.01

@@ -61,3 +61,9 @@ def test_merge_ignores_empty_values():
     merge_updates(draft, {"channel": "", "budget": None, "geography": []})
     assert draft.channel == "sms"
     assert draft.segments.geography == []
+
+
+async def test_detects_channel_meta():
+    for phrase in ["Запусти рекламу в Instagram", "Хочу кампанию в Meta", "Реклама в фейсбуке"]:
+        d = await _merge(phrase)
+        assert d.channel == "meta", phrase

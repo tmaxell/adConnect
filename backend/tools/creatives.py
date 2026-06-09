@@ -39,6 +39,7 @@ Write {n} short advertising message variants in Russian for the given product, g
 Rules:
 - SMS: each variant <= 160 characters, punchy, one call to action.
 - Email: each variant is a single subject-style line, slightly longer is fine.
+- Meta (Facebook/Instagram/WhatsApp): 1-2 short sentences of primary ad text with a clear call to action.
 - No emojis, no placeholders, no markdown. Each variant must stand alone.
 Return STRICT JSON: {{"variants": ["...", "...", "..."]}}"""
 

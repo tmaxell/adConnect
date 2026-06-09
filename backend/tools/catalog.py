@@ -20,7 +20,15 @@ class ChannelInfo:
     id: str
     label: str
     description: str
-    base_price_per_message: float   # ₽, before targeting surcharges
+    # "messaging" — operator channels priced per message (SMS/Email).
+    # "network"   — external ad networks priced by auction/CPM (Meta).
+    kind: str = "messaging"
+    base_price_per_message: float = 0.0   # messaging: ₽ per message, before surcharges
+    avg_cpm: float = 0.0                   # network: avg ₽ per 1000 impressions
+    match_rate: float = 1.0                # network: Custom Audience match rate
+    min_audience: int = 0                  # network: minimum matched audience floor
+    audience_landing: str = ""             # how an operator segment lands in the channel
+    placements: tuple[str, ...] = ()
 
 
 CHANNELS: dict[str, ChannelInfo] = {
@@ -28,20 +36,40 @@ CHANNELS: dict[str, ChannelInfo] = {
         id="sms",
         label="SMS",
         description="Promotional messages for immediate customer engagement",
+        kind="messaging",
         base_price_per_message=2.5,
     ),
     "email": ChannelInfo(
         id="email",
         label="Email",
         description="Promotional messages for ongoing customer engagement",
+        kind="messaging",
         base_price_per_message=0.4,
+    ),
+    "meta": ChannelInfo(
+        id="meta",
+        label="Meta Ads",
+        description="Facebook, Instagram & WhatsApp via Marketing API",
+        kind="network",
+        avg_cpm=300.0,
+        match_rate=0.6,
+        min_audience=1000,
+        audience_landing="Custom Audiences (SHA-256 сопоставление телефонов)",
+        placements=("Facebook", "Instagram", "WhatsApp"),
     ),
 }
 
 
+def is_network_channel(channel: str | None) -> bool:
+    info = CHANNELS.get(channel or "")
+    return bool(info and info.kind == "network")
+
+
 def resolve_channel(text: str) -> str | None:
-    """Detect a channel mentioned in free text. Returns 'sms' | 'email' | None."""
+    """Detect a channel mentioned in free text. Returns 'sms' | 'email' | 'meta' | None."""
     t = (text or "").lower()
+    if re.search(r"(meta|facebook|\bfb\b|instagram|insta|whats?app|мета|фейсбук|инстаграм|вотс?ап)", t):
+        return "meta"
     if re.search(r"\b(e-?mail|почт|имейл|емейл)\w*", t):
         return "email"
     if re.search(r"\b(sms|смс|сообщени|текстов)\w*", t):

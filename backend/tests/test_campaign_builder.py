@@ -85,3 +85,30 @@ async def test_documentation_question_routes_to_docs(convo):
     r = await convo.send("Как создать рекламную кампанию в AdConnect?")
     assert r.metadata.get("stage") == "qa"
     assert convo.draft is None  # docs agent does not produce a campaign draft
+
+
+async def test_meta_channel_flow(convo):
+    # Pick Meta explicitly → wizard adapts to the auction/CPM model.
+    await convo.send("Собери рекламную кампанию для моего бизнеса")
+    await convo.send(action=action("select_channel", channel="meta"))
+    assert convo.draft["channel"] == "meta"
+    assert convo.draft["step"] == "segments"
+
+    await convo.send(action=action("select_segment", segment_id="seg_active_mobile"))
+    await convo.send(action=action("generate_creatives"))
+    await convo.send(action=action("select_creative", index=0))
+    # Budget drives impressions via CPM (no per-message pricing for Meta).
+    r = await convo.send("Бюджет 50000")
+    d = convo.draft
+    assert d["step"] == "confirmation"
+    assert d["price_per_message"] == 0.0
+    assert d["cpm"] > 0
+    assert d["estimated_impressions"] > 0
+    assert d["cost"]["budget"] == 50000.0
+    assert d["cost"]["messages_count"] is None
+    assert any(a.id == "submit_campaign" for a in r.actions)
+
+    r = await convo.send(action=action("submit_campaign"))
+    assert convo.draft["status"] == "submitted"
+    saved = convo.store.campaigns[-1]
+    assert saved["draft"]["channel"] == "meta"

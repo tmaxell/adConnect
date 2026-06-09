@@ -126,7 +126,7 @@ Return STRICT JSON (one line, no markdown) with ONLY the fields you can confiden
 Possible fields:
 - product: string (what is advertised)
 - goal: string (the user's objective, short)
-- channel: "sms" | "email"
+- channel: "sms" | "email" | "meta"  (meta = Facebook/Instagram/WhatsApp)
 - geography: string[] (regions/cities)
 - demographics: "all" | "men" | "women"
 - age: string[] (e.g. ["18-25","45-55"])
@@ -195,7 +195,7 @@ def merge_updates(draft: CampaignDraft, updates: dict[str, Any]) -> CampaignDraf
 
         if key in {"name", "goal", "product"}:
             setattr(draft, key, value)
-        elif key == "channel" and value in ("sms", "email"):
+        elif key == "channel" and value in ("sms", "email", "meta"):
             draft.channel = value  # type: ignore[assignment]
         elif key in _SEGMENT_FIELDS:
             _apply_segment_field(draft, key, value)
