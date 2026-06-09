@@ -7,8 +7,14 @@
 export type WizardStep = "channel" | "segments" | "message" | "cost" | "confirmation" | "ready";
 export const WIZARD_STEPS: WizardStep[] = ["channel", "segments", "message", "cost", "confirmation"];
 
-export type Channel = "sms" | "email";
+export type Channel = "sms" | "email" | "meta";
 export type Demographics = "all" | "men" | "women";
+
+/** Network (auction/CPM) channels vs operator messaging channels. */
+export const NETWORK_CHANNELS_IDS: Channel[] = ["meta"];
+export function isNetworkChannel(channel: Channel | null): boolean {
+  return channel != null && NETWORK_CHANNELS_IDS.includes(channel);
+}
 
 export interface SegmentSpec {
   template: string | null;
@@ -52,6 +58,8 @@ export interface CampaignDraft {
   audience_reach: number;
   price_per_message: number;
   estimated_cost: number;
+  cpm: number;
+  estimated_impressions: number;
   status: "draft" | "submitted";
   step: WizardStep;
 }

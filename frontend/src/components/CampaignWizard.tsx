@@ -8,8 +8,13 @@
  * step follows `draft.step`.
  */
 
-import type { CampaignDraft, WizardStep } from "../types/campaign";
+import { isNetworkChannel, type CampaignDraft, type WizardStep } from "../types/campaign";
 import { NETWORK_CHANNELS, OPERATOR_CHANNELS, type ChannelCard } from "./channels";
+
+const CHANNEL_LABEL: Record<string, string> = { sms: "SMS", email: "Email", meta: "Meta" };
+function channelLabel(c: string | null): string {
+  return c ? CHANNEL_LABEL[c] ?? c.toUpperCase() : "New";
+}
 
 const STEP_LABELS: Record<Exclude<WizardStep, "ready">, string> = {
   channel: "Sending Channel",
@@ -38,7 +43,7 @@ function StepBar({ draft }: { draft: CampaignDraft }) {
   const submitted = draft.status === "submitted";
   return (
     <div className="acw-typecard">
-      <div className="acw-typename">{draft.channel ? `${draft.channel.toUpperCase()} Campaign` : "New Campaign"}</div>
+      <div className="acw-typename">{draft.channel ? `${channelLabel(draft.channel)} Campaign` : "New Campaign"}</div>
       <div className="acw-steps">
         {STEP_ORDER.map((step, i) => {
           const done = submitted || i < currentIdx;
@@ -58,12 +63,24 @@ function StepBar({ draft }: { draft: CampaignDraft }) {
 // ── Reach / price panel ─────────────────────────────────────────────────────────
 
 function ReachPanel({ draft }: { draft: CampaignDraft }) {
+  const network = isNetworkChannel(draft.channel);
   return (
     <aside className="acw-reach">
       <div className="acw-reach-num">{fmt(draft.audience_reach || 0)}</div>
-      <div className="acw-reach-cap">Audience reach</div>
-      <div className="acw-price-num">{draft.price_per_message || 0} ₽ <span className="acw-info">ⓘ</span></div>
-      <div className="acw-reach-cap">Price per message</div>
+      <div className="acw-reach-cap">{network ? "Custom Audience" : "Audience reach"}</div>
+      {network ? (
+        <>
+          <div className="acw-price-num">{draft.cpm || 0} ₽ <span className="acw-info">ⓘ</span></div>
+          <div className="acw-reach-cap">CPM (за 1000 показов)</div>
+          <div className="acw-price-num acw-reach-imp">{fmt(draft.estimated_impressions || 0)}</div>
+          <div className="acw-reach-cap">Ожидаемые показы</div>
+        </>
+      ) : (
+        <>
+          <div className="acw-price-num">{draft.price_per_message || 0} ₽ <span className="acw-info">ⓘ</span></div>
+          <div className="acw-reach-cap">Price per message</div>
+        </>
+      )}
     </aside>
   );
 }
@@ -122,7 +139,7 @@ function ChannelStep({ draft }: { draft: CampaignDraft }) {
       <div className="acw-section-title">Внешние рекламные сети</div>
       <div className="acw-chan-list">
         {NETWORK_CHANNELS.map((c) => (
-          <ChannelCardView key={c.id} card={c} selected={false} />
+          <ChannelCardView key={c.id} card={c} selected={draft.channel === c.id} />
         ))}
       </div>
     </>
@@ -203,17 +220,24 @@ function MessageStep({ draft }: { draft: CampaignDraft }) {
 
 function CostStep({ draft }: { draft: CampaignDraft }) {
   const c = draft.cost;
+  const network = isNetworkChannel(draft.channel);
   return (
     <>
       <Field label="Cost">
         <div className="acw-input-mock">
           {c.budget != null ? `${fmt(c.budget)} ₽` : <span className="acw-placeholder">Your campaign budget, ₽</span>}
         </div>
-        <div className="acw-sub-field">
-          <div className="acw-input-mock">
-            {c.messages_count != null ? `${fmt(c.messages_count)} messages` : <span className="acw-placeholder">Number of messages</span>}
+        {network ? (
+          draft.estimated_impressions > 0 && (
+            <div className="acw-hint">≈ {fmt(draft.estimated_impressions)} показов при CPM {draft.cpm} ₽</div>
+          )
+        ) : (
+          <div className="acw-sub-field">
+            <div className="acw-input-mock">
+              {c.messages_count != null ? `${fmt(c.messages_count)} messages` : <span className="acw-placeholder">Number of messages</span>}
+            </div>
           </div>
-        </div>
+        )}
       </Field>
       <Field label="Ad Campaign Conditions">
         <div className="acw-two-col">
@@ -235,14 +259,23 @@ function CostStep({ draft }: { draft: CampaignDraft }) {
 
 function ConfirmationStep({ draft }: { draft: CampaignDraft }) {
   const s = draft.segments;
+  const network = isNetworkChannel(draft.channel);
   const rows: Array<[string, string]> = [
+    ["Channel", channelLabel(draft.channel)],
     ["Demographics", s.demographics === "all" ? "All" : s.demographics],
     ["Geography", s.geography.join(", ") || "Russia"],
     ["Age", s.age.join(", ") || "—"],
     ["Interests", s.interests.join(", ") || "—"],
-    ["Income", s.monthly_income || "—"],
-    ["Age of the children", s.children_age.join(", ") || "—"],
   ];
+  if (network) {
+    rows.push(["Placements", "Facebook, Instagram, WhatsApp"]);
+    rows.push(["Custom Audience", fmt(draft.audience_reach)]);
+    rows.push(["CPM", `${draft.cpm} ₽`]);
+    rows.push(["Est. impressions", fmt(draft.estimated_impressions)]);
+  } else {
+    rows.push(["Income", s.monthly_income || "—"]);
+    rows.push(["Age of the children", s.children_age.join(", ") || "—"]);
+  }
   return (
     <>
       <div className="acw-section-title">Audience parameters</div>

@@ -422,3 +422,7 @@
 .acw-btn-ghost { background: var(--ac-surface); border: 1px solid var(--ac-border); color: var(--ac-accent); }
 .acw-btn-primary { background: var(--ac-accent); color: #fff; }
 .acw-btn-primary.done { background: #16a34a; }
+
+/* Wizard — network channel (Meta) extras */
+.acw-hint { font-size: 13px; color: var(--ac-text-secondary); margin-top: 8px; }
+.acw-reach-imp { margin-top: 14px; }

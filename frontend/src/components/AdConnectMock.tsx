@@ -297,14 +297,17 @@ function mapStatus(status: string): CampaignRow["status"] {
   return "draft";
 }
 
+const CHANNEL_LABELS: Record<string, string> = { sms: "SMS", email: "Email", meta: "Meta" };
+
 function campaignToRow(c: CampaignSummary): CampaignRow {
   const price = c.estimatedCost > 0 ? c.estimatedCost : c.budget ?? 0;
+  const ch = c.channel || "sms";
   return {
     name: c.name,
     id: String(100000 + c.id),
     created: c.createdAt ? `Date created: ${fmtDate(c.createdAt)}` : "",
     period: c.startDate && c.endDate ? `${c.startDate}-${c.endDate}` : "—",
-    channel: (c.channel || "sms").toUpperCase(),
+    channel: CHANNEL_LABELS[ch] ?? ch.toUpperCase(),
     price: price > 0 ? `${fmtNumber(Math.round(price))} ₽` : "—",
     status: mapStatus(c.status),
   };

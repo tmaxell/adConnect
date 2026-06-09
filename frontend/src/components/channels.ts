@@ -56,13 +56,13 @@ export const NETWORK_CHANNELS: ChannelCard[] = [
     note: "Реселлерская модель, суб-баланс на нашей стороне",
   },
   {
-    id: "meta_ads",
+    id: "meta",
     label: "Meta Ads",
     description: "Facebook, Instagram & WhatsApp via Marketing API",
     group: "network",
-    status: "planned",
+    status: "available",
     audienceLanding: "Custom Audiences (SHA-256 сопоставление телефонов)",
-    note: "Агентские кабинеты под Business Manager оператора",
+    note: "Оплата за показы (CPM ≈ 300 ₽), агентские кабинеты под Business Manager",
   },
   {
     id: "google_ads",

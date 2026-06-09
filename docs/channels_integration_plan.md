@@ -71,12 +71,19 @@ adapters come online:
 
 ## 4. Phased rollout
 
-- **Phase 0 (done).** Display-only network cards in the channel step with audience-
-  landing hints. Agent builds SMS/Email campaigns end to end. Sets user expectations
-  about what's coming.
-- **Phase 1 — Meta adapter.** Richest API; agency cabinets under the operator BM,
-  Custom Audiences, prepay funding. Turn Meta card selectable; wire segment hashing
-  + upload in the operator data layer; add match-rate/delay UI; WhatsApp sub-option.
+- **Phase 0 (done).** Channel step shows operator channels + network cards. Agent
+  builds SMS/Email campaigns end to end.
+- **Phase 0.5 — Meta as a channel, forecast-level (done).** Meta is now a
+  **selectable** channel: the wizard models it as an auction/CPM channel — the
+  operator segment lands as a Custom Audience (reach × match rate), pricing is CPM
+  (impressions = budget ÷ CPM × 1000) instead of per-message, and the canvas panel
+  shows Custom Audience / CPM / expected impressions. Placements
+  (Facebook/Instagram/WhatsApp) are surfaced. No real Marketing-API adapter yet —
+  numbers are estimated, submit only changes status. Telegram/Google stay "Скоро".
+- **Phase 1 — Meta adapter (real).** Wire Marketing API: agency cabinets under the
+  operator BM, segment hashing + Custom Audience upload in the operator data layer,
+  match-rate/delay UI, WhatsApp Click-to-WhatsApp, prepay funding + wallet
+  reservation, network moderation status.
 - **Phase 2 — Google adapter.** MCC + Customer Match + consolidated billing /
   budget orders. Reuse the same hashed-segment service.
 - **Phase 3 — Telegram adapter.** Reseller access; channel/topic targeting from the
