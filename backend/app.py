@@ -21,17 +21,27 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
 import logging
+import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from agents.base import AgentContext
 from agents.supervisor import handle as supervisor_handle
 from db import ChatStore, init_db
-from schemas import ChatAction, ChatArtifact, ChatTraceEvent
+from schemas import CampaignDraft, ChatAction, ChatArtifact, ChatTraceEvent
+from tools import creative_gen, naming
+from tools.draft_ops import apply_patch
+from tools.forecast import apply_forecast
+
+# Generated/uploaded creatives live here and are served under /api/uploads so the
+# Vite dev proxy and the nginx /api → backend rule both reach them unchanged.
+UPLOADS_DIR = Path(__file__).resolve().parent / "data" / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -56,6 +66,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.mount("/api/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 
 # ── Request / response schemas ────────────────────────────────────────────────
@@ -118,6 +129,118 @@ async def list_session_messages(session_id: str):
 async def list_campaigns():
     """Campaigns assembled by the agent — backs the Ad Campaigns list."""
     return await store.list_campaigns()
+
+
+# ── Interactive draft (clickable canvas) ──────────────────────────────────────
+# The canvas mutates the same `campaign_draft` artifact as the chat agent, so the
+# user can build a campaign by clicking — not only by talking to the copilot.
+
+class DraftPatchRequest(BaseModel):
+    patch: dict[str, Any] = Field(default_factory=dict)
+
+
+class CreativeGenerateRequest(BaseModel):
+    format: str = "feed"
+    media_type: str = "image"       # "image" | "video"
+    headline: str | None = None
+    brand: str | None = None
+
+
+async def _load_latest_draft(session_id: str) -> CampaignDraft:
+    artifacts = await store.list_artifacts(session_id=session_id)
+    drafts = [a for a in artifacts if a.get("type") == "campaign_draft"]
+    if drafts and isinstance(drafts[-1].get("content"), dict):
+        try:
+            return CampaignDraft.model_validate(drafts[-1]["content"])
+        except Exception:  # pragma: no cover - defensive
+            logger.warning("PATCH draft: stale artifact, starting fresh")
+    return CampaignDraft()
+
+
+async def _recompute_and_save(session_id: str, draft: CampaignDraft) -> dict[str, Any]:
+    apply_forecast(draft)
+    if draft.status != "submitted":
+        draft.step = draft.current_step()
+    if draft.step == "confirmation" and not draft.name:
+        draft.name = await naming.generate_campaign_name(
+            draft.product, draft.goal,
+            channel=draft.channel, audience=draft.segments.matched_segment_name,
+        )
+    content = draft.model_dump(mode="json")
+    await store.save_artifact(session_id=session_id, artifact_type="campaign_draft", content_json=content)
+    return content
+
+
+@app.get("/api/sessions/{session_id}/draft")
+async def get_draft(session_id: str):
+    if await store.get_session(session_id) is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    draft = await _load_latest_draft(session_id)
+    return {"draft": draft.model_dump(mode="json")}
+
+
+@app.patch("/api/sessions/{session_id}/draft")
+async def patch_draft(session_id: str, request: DraftPatchRequest):
+    """Apply a small patch from a canvas click → merge, recompute forecast, persist."""
+    if await store.ensure_session(session_id=session_id) is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    draft = await _load_latest_draft(session_id)
+    apply_patch(draft, request.patch)
+    content = await _recompute_and_save(session_id, draft)
+    return {"draft": content}
+
+
+@app.post("/api/sessions/{session_id}/creative/generate")
+async def generate_creative(session_id: str, request: CreativeGenerateRequest):
+    """Mock creative generation — synthesise a branded placeholder for the format."""
+    if await store.ensure_session(session_id=session_id) is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    draft = await _load_latest_draft(session_id)
+    headline = request.headline or draft.message.text or draft.goal
+    svg = creative_gen.generate_svg(
+        fmt=request.format, media_type=request.media_type,
+        headline=headline, brand=request.brand or draft.product,
+        seed=len(await store.list_artifacts(session_id=session_id)),
+    )
+    name = f"{uuid.uuid4().hex}.svg"
+    (UPLOADS_DIR / name).write_text(svg, encoding="utf-8")
+    url = f"/api/uploads/{name}"
+
+    draft.channel = "meta"
+    draft.meta.creative.format = request.format  # type: ignore[assignment]
+    draft.meta.creative.media_type = request.media_type  # type: ignore[assignment]
+    draft.meta.creative.media_url = url
+    draft.meta.creative.media_source = "generated"
+    if headline:
+        draft.meta.creative.headline = headline
+    content = await _recompute_and_save(session_id, draft)
+    return {"url": url, "media_type": request.media_type, "draft": content}
+
+
+@app.post("/api/sessions/{session_id}/creative/upload")
+async def upload_creative(session_id: str, file: UploadFile = File(...)):
+    """Real upload — store the asset and attach it to the draft's Meta creative."""
+    if await store.ensure_session(session_id=session_id) is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    ctype = (file.content_type or "").lower()
+    media_type = "video" if ctype.startswith("video") else "image"
+    if not (ctype.startswith("image") or ctype.startswith("video")):
+        raise HTTPException(status_code=415, detail="Only image or video files are accepted")
+    suffix = Path(file.filename or "").suffix.lower()[:8] or (".mp4" if media_type == "video" else ".png")
+    data = await file.read()
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large (max 25 MB)")
+    name = f"{uuid.uuid4().hex}{suffix}"
+    (UPLOADS_DIR / name).write_bytes(data)
+    url = f"/api/uploads/{name}"
+
+    draft = await _load_latest_draft(session_id)
+    draft.channel = "meta"
+    draft.meta.creative.media_type = media_type  # type: ignore[assignment]
+    draft.meta.creative.media_url = url
+    draft.meta.creative.media_source = "upload"
+    content = await _recompute_and_save(session_id, draft)
+    return {"url": url, "media_type": media_type, "draft": content}
 
 
 # ── Unified chat — supervisor entry point ─────────────────────────────────────

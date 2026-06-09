@@ -101,6 +101,19 @@ MetaObjective = Literal["awareness", "traffic", "engagement", "leads", "sales"]
 # Publisher platforms (WhatsApp is reached via Click-to-WhatsApp, not a placement).
 META_PLACEMENTS: tuple[str, ...] = ("facebook", "instagram", "messenger", "audience_network")
 
+# Ad creative format (maps to placement positions / Click-to-WhatsApp destination).
+MetaFormat = Literal["feed", "stories", "reels", "whatsapp"]
+MediaType = Literal["none", "image", "video"]
+
+
+class MetaCreative(BaseModel):
+    """Creative for a Meta ad: format, media asset and headline."""
+    format: MetaFormat = "feed"
+    media_type: MediaType = "none"
+    media_url: str | None = None                     # uploaded or generated asset
+    media_source: Literal["upload", "generated"] | None = None
+    headline: str | None = None
+
 
 class MetaSpec(BaseModel):
     """Meta-specific campaign config (maps to Campaign objective + Ad Set placements)."""
@@ -108,6 +121,7 @@ class MetaSpec(BaseModel):
     placements: list[str] = Field(default_factory=lambda: ["facebook", "instagram"])
     lookalike: bool = False
     optimization_goal: str = "link_clicks"
+    creative: MetaCreative = Field(default_factory=MetaCreative)
 
 
 class PlatformStat(BaseModel):

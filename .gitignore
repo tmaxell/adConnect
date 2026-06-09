@@ -15,6 +15,7 @@ venv/
 # ── Secrets / local data ──────────────────────────────────────────────────────
 backend/.env
 backend/data/*.sqlite3
+backend/data/uploads/
 
 # ── Node / frontend ───────────────────────────────────────────────────────────
 node_modules/

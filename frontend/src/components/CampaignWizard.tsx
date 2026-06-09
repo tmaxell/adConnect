@@ -410,49 +410,10 @@ function ConfirmationStep({ draft }: { draft: CampaignDraft }) {
       {draft.message.text && (
         <Field label="Сообщение"><div className="acw-textarea-mock">{draft.message.text}</div></Field>
       )}
-      {network && <AnalyticsPreview draft={draft} />}
       {draft.status === "submitted" && (
         <div className="acw-submitted">✓ Отправлено на модерацию</div>
       )}
     </>
-  );
-}
-
-// Analytics preview — concept of the per-platform reporting the Insights API will
-// fill after launch (publisher_platform breakdown). Clearly marked as a preview.
-function AnalyticsPreview({ draft }: { draft: CampaignDraft }) {
-  const rows = draft.platform_breakdown.length
-    ? draft.platform_breakdown
-    : [{ platform: "facebook", label: "Facebook", impressions: 0, reach: 0 }];
-  const ctr: Record<string, number> = { facebook: 0.012, instagram: 0.016, messenger: 0.008, audience_network: 0.006 };
-  const cvr: Record<string, number> = { facebook: 0.03, instagram: 0.035, messenger: 0.02, audience_network: 0.015 };
-  const cpm = draft.cpm || 0;
-  return (
-    <Field label="Аналитика после запуска (предпросмотр)">
-      <div className="acw-analytics">
-        <div className="acw-analytics-head acw-analytics-row">
-          <span>Платформа</span><span>Показы</span><span>Охват</span><span>CTR</span><span>CPM</span><span>Конв.</span>
-        </div>
-        {rows.map((p) => {
-          const clicks = Math.round(p.impressions * (ctr[p.platform] ?? 0.01));
-          const conversions = Math.round(clicks * (cvr[p.platform] ?? 0.025));
-          return (
-            <div key={p.platform} className="acw-analytics-row">
-              <span className="acw-platform-name"><PlatformDot platform={p.platform} />{p.label}</span>
-              <span>{fmt(p.impressions)}</span>
-              <span>{fmt(p.reach)}</span>
-              <span>{((ctr[p.platform] ?? 0.01) * 100).toFixed(1)}%</span>
-              <span>{cpm} ₽</span>
-              <span>{fmt(conversions)}</span>
-            </div>
-          );
-        })}
-        <div className="acw-analytics-note">
-          Демо-данные. После запуска подтянутся из Meta Insights — breakdown по платформам,
-          плейсментам (Feed / Stories / Reels), полу, возрасту и гео.
-        </div>
-      </div>
-    </Field>
   );
 }
 
