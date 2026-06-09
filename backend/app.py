@@ -11,9 +11,14 @@ Endpoints (same contract as cvm-agents, so the existing frontend works unchanged
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load backend/.env by absolute path so it works regardless of the process cwd
+# (uvicorn, docker, tests). override=False keeps real env vars (e.g. docker
+# env_file / compose) authoritative when both are present.
+load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
 import logging
 from contextlib import asynccontextmanager

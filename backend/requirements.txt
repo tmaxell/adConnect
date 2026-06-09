@@ -9,12 +9,12 @@ httpx>=0.27.0
 # ── Data validation ───────────────────────────────────────────────────────────
 pydantic>=2.7.0
 
-# ── LLM core (provider packages installed on demand, see llm.py) ──────────────
+# ── LLM core + providers ──────────────────────────────────────────────────────
 langchain-core>=0.2.0
+langchain-groq>=0.1.0               # groq   (LLM_PROVIDER=groq, default)
+langchain-google-genai>=1.0.0       # gemini (LLM_PROVIDER=gemini, fallback)
 
-# Optional LLM providers — install the one matching LLM_PROVIDER in .env:
-#   langchain-google-genai>=1.0.0    # gemini  (recommended free tier)
-#   langchain-groq>=0.1.0            # groq
+# Other providers — install if you switch LLM_PROVIDER in .env:
 #   langchain-gigachat>=0.3.0        # gigachat (Sber)
 #   langchain-ollama>=0.1.0          # ollama  (local)
 #   langchain-anthropic>=0.3.2       # anthropic
