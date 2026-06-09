@@ -426,3 +426,19 @@
 /* Wizard — network channel (Meta) extras */
 .acw-hint { font-size: 13px; color: var(--ac-text-secondary); margin-top: 8px; }
 .acw-reach-imp { margin-top: 14px; }
+
+/* Meta-specific wizard UI */
+.acw-platforms { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--ac-border-soft); padding-top: 10px; }
+.acw-platform-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--ac-text-secondary); }
+.acw-platform-row span:last-child { color: var(--ac-text); font-weight: 600; }
+
+.acw-meta-setup { display: flex; flex-direction: column; gap: 12px; }
+.acw-meta-row { display: flex; align-items: center; gap: 12px; }
+.acw-meta-k { font-size: 13px; color: var(--ac-text-secondary); min-width: 96px; }
+.acw-chip-off { color: var(--ac-text-muted); background: #f8fafc; border: 1px dashed var(--ac-border); }
+
+.acw-analytics { border: 1px solid var(--ac-border); border-radius: 8px; overflow: hidden; }
+.acw-analytics-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr 0.7fr; gap: 8px; padding: 8px 12px; font-size: 13px; border-bottom: 1px solid var(--ac-border-soft); }
+.acw-analytics-row span:not(:first-child) { text-align: right; color: var(--ac-text); }
+.acw-analytics-head { background: var(--ac-surface-2, #f8fafc); color: var(--ac-text-secondary); font-weight: 600; }
+.acw-analytics-note { padding: 8px 12px; font-size: 12px; color: var(--ac-text-muted); }

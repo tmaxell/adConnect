@@ -76,3 +76,26 @@ def test_meta_audience_capped_by_match_rate():
     # Meta reach ≈ SMS reach × match rate (Custom Audience match).
     ratio = meta.audience_reach / sms.audience_reach
     assert abs(ratio - CHANNELS["meta"].match_rate) < 0.01
+
+
+def test_meta_platform_breakdown_splits_impressions():
+    from tools.forecast import apply_forecast
+    draft = CampaignDraft(channel="meta", segments=SegmentSpec(interests=["sport"]))
+    draft.meta.placements = ["facebook", "instagram"]
+    draft.cost.budget = 60_000
+    apply_forecast(draft)
+    labels = {b.platform for b in draft.platform_breakdown}
+    assert labels == {"facebook", "instagram"}
+    total = sum(b.impressions for b in draft.platform_breakdown)
+    # Split covers ~all impressions (integer rounding aside).
+    assert abs(total - draft.estimated_impressions) <= len(draft.platform_breakdown)
+    fb = next(b for b in draft.platform_breakdown if b.platform == "facebook")
+    ig = next(b for b in draft.platform_breakdown if b.platform == "instagram")
+    assert fb.impressions > ig.impressions  # facebook weighted higher
+
+
+def test_messaging_has_no_platform_breakdown():
+    from tools.forecast import apply_forecast
+    draft = CampaignDraft(channel="sms")
+    apply_forecast(draft)
+    assert draft.platform_breakdown == []

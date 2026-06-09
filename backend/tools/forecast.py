@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from schemas import CampaignDraft, SegmentSpec
+from schemas import CampaignDraft, PlatformStat, SegmentSpec
 from tools.catalog import CHANNELS, SEGMENTS_BY_ID
 
 # Full operator subscriber base (matches the "Audience reach" figure in the UI).
@@ -36,6 +36,13 @@ _PAID_DIMENSION_SURCHARGE = 0.30
 
 # Average impressions per reached person (network channels).
 _AVG_FREQUENCY = 1.8
+
+# Relative impression share per Meta publisher platform (normalized over selected).
+_PLATFORM_WEIGHT = {"facebook": 0.45, "instagram": 0.40, "messenger": 0.05, "audience_network": 0.10}
+_PLATFORM_LABEL = {
+    "facebook": "Facebook", "instagram": "Instagram",
+    "messenger": "Messenger", "audience_network": "Audience Network",
+}
 
 
 @dataclass
@@ -131,6 +138,30 @@ def _estimate_network(draft: CampaignDraft, channel) -> Forecast:
     )
 
 
+def platform_breakdown(draft: CampaignDraft) -> list[PlatformStat]:
+    """Split expected impressions/reach across the selected Meta placements.
+
+    Mirrors an Insights `publisher_platform` breakdown — the basis for the
+    per-platform reporting we'll show after launch.
+    """
+    places = draft.meta.placements or ["facebook", "instagram"]
+    weights = {p: _PLATFORM_WEIGHT.get(p, 0.10) for p in places}
+    total = sum(weights.values()) or 1.0
+    rows: list[PlatformStat] = []
+    for p in places:
+        share = weights[p] / total
+        impressions = int(draft.estimated_impressions * share)
+        # Delivered reach = impressions / frequency, capped by the audience share.
+        reach = min(int(impressions / _AVG_FREQUENCY), int(draft.audience_reach * share))
+        rows.append(PlatformStat(
+            platform=p,
+            label=_PLATFORM_LABEL.get(p, p.title()),
+            impressions=impressions,
+            reach=reach,
+        ))
+    return rows
+
+
 def apply_forecast(draft: CampaignDraft) -> CampaignDraft:
     """Recompute the forecast and write it back onto the draft in place."""
     f = estimate(draft)
@@ -142,4 +173,7 @@ def apply_forecast(draft: CampaignDraft) -> CampaignDraft:
     # Messages count only applies to messaging channels.
     if f.messages_count and draft.cost.messages_count is None:
         draft.cost.messages_count = f.messages_count
+    # Per-platform split only for network channels (Meta).
+    channel = CHANNELS.get(draft.channel or "")
+    draft.platform_breakdown = platform_breakdown(draft) if (channel and channel.kind == "network") else []
     return draft

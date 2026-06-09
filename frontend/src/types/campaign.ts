@@ -37,6 +37,22 @@ export interface MessageSpec {
   variants: string[];
 }
 
+export type MetaObjective = "awareness" | "traffic" | "engagement" | "leads" | "sales";
+
+export interface MetaSpec {
+  objective: MetaObjective;
+  placements: string[];
+  lookalike: boolean;
+  optimization_goal: string;
+}
+
+export interface PlatformStat {
+  platform: string;
+  label: string;
+  impressions: number;
+  reach: number;
+}
+
 export interface CostSpec {
   budget: number | null;
   messages_count: number | null;
@@ -56,11 +72,13 @@ export interface CampaignDraft {
   segments: SegmentSpec;
   message: MessageSpec;
   cost: CostSpec;
+  meta: MetaSpec;
   audience_reach: number;
   price_per_message: number;
   estimated_cost: number;
   cpm: number;
   estimated_impressions: number;
+  platform_breakdown: PlatformStat[];
   status: "draft" | "submitted";
   step: WizardStep;
 }

@@ -96,6 +96,28 @@ class SegmentSpec(BaseModel):
         return self.audience_confirmed or bool(self.matched_segment_id)
 
 
+MetaObjective = Literal["awareness", "traffic", "engagement", "leads", "sales"]
+
+# Publisher platforms (WhatsApp is reached via Click-to-WhatsApp, not a placement).
+META_PLACEMENTS: tuple[str, ...] = ("facebook", "instagram", "messenger", "audience_network")
+
+
+class MetaSpec(BaseModel):
+    """Meta-specific campaign config (maps to Campaign objective + Ad Set placements)."""
+    objective: MetaObjective = "traffic"
+    placements: list[str] = Field(default_factory=lambda: ["facebook", "instagram"])
+    lookalike: bool = False
+    optimization_goal: str = "link_clicks"
+
+
+class PlatformStat(BaseModel):
+    """Per-publisher-platform forecast row (mirrors an Insights publisher_platform breakdown)."""
+    platform: str
+    label: str
+    impressions: int
+    reach: int
+
+
 class MessageSpec(BaseModel):
     """The creative — the "Message" wizard step."""
     text: str | None = None
@@ -136,12 +158,14 @@ class CampaignDraft(BaseModel):
     segments: SegmentSpec = Field(default_factory=SegmentSpec)
     message: MessageSpec = Field(default_factory=MessageSpec)
     cost: CostSpec = Field(default_factory=CostSpec)
+    meta: MetaSpec = Field(default_factory=MetaSpec)   # used when channel == "meta"
 
     audience_reach: int = 0
     price_per_message: float = 0.0        # messaging channels (SMS/Email)
     estimated_cost: float = 0.0
     cpm: float = 0.0                       # network channels (Meta): ₽ per 1000 impressions
     estimated_impressions: int = 0         # network channels: budget ÷ CPM × 1000
+    platform_breakdown: list[PlatformStat] = Field(default_factory=list)  # Meta per-platform split
 
     status: Literal["draft", "submitted"] = "draft"
     step: WizardStep = "channel"

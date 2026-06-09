@@ -21,6 +21,7 @@ never launches the campaign or charges the wallet.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Any
 
@@ -60,6 +61,11 @@ async def execute(ctx: AgentContext) -> AgentResult:
         result = await _handle_action(ctx, draft, action_id)
     elif ctx.message.strip():
         await update_draft_from_message(draft, ctx.message, history=ctx.history)
+        # Infer the Meta objective from the RAW request (the LLM may summarize the
+        # goal and drop intent words like "заявки"); never downgrade a specific one.
+        inferred = _infer_objective(ctx.message)
+        if inferred != "traffic":
+            draft.meta.objective = inferred
         # A free-text reply while on the segments step is the user describing their
         # audience → count it as an explicit audience decision.
         if prior_step == "segments":
@@ -103,6 +109,10 @@ async def _handle_action(ctx: AgentContext, draft: CampaignDraft, action_id: str
     if action_id == "select_channel":
         if payload.get("channel") in ("sms", "email", "meta"):
             draft.channel = payload["channel"]
+        return None
+
+    if action_id == "toggle_lookalike":
+        draft.meta.lookalike = not draft.meta.lookalike
         return None
 
     if action_id == "select_segment":
@@ -293,7 +303,34 @@ def _ask_segments(draft: CampaignDraft) -> AgentResult:
         ChatAction(id="suggest_audience", label="Подобрать аудиторию за меня", kind="primary", payload={}),
         ChatAction(id="keep_audience", label="Продолжить с этой аудиторией", kind="default", payload={}),
     ]
+    if is_network_channel(draft.channel):
+        ll = draft.meta.lookalike
+        actions.append(ChatAction(
+            id="toggle_lookalike",
+            label=("Выключить похожую аудиторию" if ll else "Расширить похожей аудиторией (lookalike)"),
+            kind="default", payload={},
+        ))
     return _wrap(draft, msg, actions)
+
+
+_OBJECTIVE_RULES: list[tuple[str, str]] = [
+    ("sales", r"продаж|купить|заказ|покупк|выручк|конверс"),
+    ("leads", r"заявк|лид|регистрац|подписк на|запис"),
+    ("awareness", r"узнаваем|охват|бренд"),
+    ("engagement", r"вовлеч|подписчик|лайк|актив"),
+]
+_OBJECTIVE_LABEL = {
+    "awareness": "Узнаваемость", "traffic": "Трафик", "engagement": "Вовлечённость",
+    "leads": "Лиды", "sales": "Продажи",
+}
+
+
+def _infer_objective(goal: str | None) -> str:
+    g = (goal or "").lower()
+    for objective, pattern in _OBJECTIVE_RULES:
+        if re.search(pattern, g):
+            return objective
+    return "traffic"
 
 
 def _audience_hint(draft: CampaignDraft) -> str:
@@ -375,15 +412,23 @@ def _summary(draft: CampaignDraft) -> str:
         f"- **{'Объявление' if network else 'Сообщение'}**: {draft.message.text or '—'}",
     ]
     if network:
-        ci = CHANNELS[draft.channel]
         impressions = f"{draft.estimated_impressions:,}".replace(",", " ")
+        placement_labels = {b.platform: b.label for b in draft.platform_breakdown}
+        placements = ", ".join(placement_labels.get(p, p) for p in draft.meta.placements) or "Facebook, Instagram"
+        split = " · ".join(
+            f"{b.label} {b.impressions:,}".replace(",", " ") for b in draft.platform_breakdown
+        )
         rows += [
-            f"- **Размещение**: {', '.join(ci.placements)}",
+            f"- **Цель**: {_OBJECTIVE_LABEL.get(draft.meta.objective, draft.meta.objective)}",
+            f"- **Плейсменты**: {placements}",
+            f"- **Похожая аудитория (lookalike)**: {'да' if draft.meta.lookalike else 'нет'}",
             f"- **Аудитория (Custom Audience)**: ≈ {reach}",
             f"- **CPM**: {draft.cpm:.0f} ₽",
             f"- **Ожидаемые показы**: ≈ {impressions}",
-            f"- **Бюджет**: {_budget_text(draft)}",
         ]
+        if split:
+            rows.append(f"- **По платформам**: {split}")
+        rows.append(f"- **Бюджет**: {_budget_text(draft)}")
     else:
         rows += [
             f"- **Охват**: ≈ {reach}",

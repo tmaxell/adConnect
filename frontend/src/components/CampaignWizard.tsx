@@ -16,6 +16,16 @@ function channelLabel(c: string | null): string {
   return c ? CHANNEL_LABEL[c] ?? c.toUpperCase() : "New";
 }
 
+const OBJECTIVE_LABEL: Record<string, string> = {
+  awareness: "Узнаваемость", traffic: "Трафик", engagement: "Вовлечённость",
+  leads: "Лиды", sales: "Продажи",
+};
+const PLACEMENT_LABEL: Record<string, string> = {
+  facebook: "Facebook", instagram: "Instagram",
+  messenger: "Messenger", audience_network: "Audience Network",
+};
+const ALL_PLACEMENTS = ["facebook", "instagram", "messenger", "audience_network"];
+
 const STEP_LABELS: Record<Exclude<WizardStep, "ready">, string> = {
   channel: "Sending Channel",
   segments: "Segments",
@@ -74,6 +84,15 @@ function ReachPanel({ draft }: { draft: CampaignDraft }) {
           <div className="acw-reach-cap">CPM (за 1000 показов)</div>
           <div className="acw-price-num acw-reach-imp">{fmt(draft.estimated_impressions || 0)}</div>
           <div className="acw-reach-cap">Ожидаемые показы</div>
+          {draft.platform_breakdown.length > 0 && (
+            <div className="acw-platforms">
+              {draft.platform_breakdown.map((p) => (
+                <div key={p.platform} className="acw-platform-row">
+                  <span>{p.label}</span><span>{fmt(p.impressions)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       ) : (
         <>
@@ -148,10 +167,38 @@ function ChannelStep({ draft }: { draft: CampaignDraft }) {
 
 // ── Segments step ────────────────────────────────────────────────────────────────
 
+function MetaSetup({ draft }: { draft: CampaignDraft }) {
+  return (
+    <Field label="Meta setup">
+      <div className="acw-meta-setup">
+        <div className="acw-meta-row">
+          <span className="acw-meta-k">Цель</span>
+          <span>{OBJECTIVE_LABEL[draft.meta.objective] ?? draft.meta.objective}</span>
+        </div>
+        <div className="acw-meta-row">
+          <span className="acw-meta-k">Плейсменты</span>
+          <span className="acw-chips">
+            {ALL_PLACEMENTS.map((p) => (
+              <span key={p} className={`acw-chip${draft.meta.placements.includes(p) ? " acw-chip-accent" : " acw-chip-off"}`}>
+                {PLACEMENT_LABEL[p]}
+              </span>
+            ))}
+          </span>
+        </div>
+        <div className="acw-toggle-row">
+          <span>Похожая аудитория (lookalike)</span>
+          <span className={`acw-toggle${draft.meta.lookalike ? " on" : ""}`} />
+        </div>
+      </div>
+    </Field>
+  );
+}
+
 function SegmentsStep({ draft }: { draft: CampaignDraft }) {
   const s = draft.segments;
   return (
     <>
+      {isNetworkChannel(draft.channel) && <MetaSetup draft={draft} />}
       {s.matched_segment_name && (
         <Field label="Template / matched segment">
           <div className="acw-chips"><span className="acw-chip acw-chip-accent">{s.matched_segment_name}</span></div>
@@ -268,7 +315,10 @@ function ConfirmationStep({ draft }: { draft: CampaignDraft }) {
     ["Interests", s.interests.join(", ") || "—"],
   ];
   if (network) {
-    rows.push(["Placements", "Facebook, Instagram, WhatsApp"]);
+    const placements = draft.meta.placements.map((p) => PLACEMENT_LABEL[p] ?? p).join(", ");
+    rows.push(["Objective", OBJECTIVE_LABEL[draft.meta.objective] ?? draft.meta.objective]);
+    rows.push(["Placements", placements || "Facebook, Instagram"]);
+    rows.push(["Lookalike", draft.meta.lookalike ? "Да" : "Нет"]);
     rows.push(["Custom Audience", fmt(draft.audience_reach)]);
     rows.push(["CPM", `${draft.cpm} ₽`]);
     rows.push(["Est. impressions", fmt(draft.estimated_impressions)]);
@@ -290,10 +340,41 @@ function ConfirmationStep({ draft }: { draft: CampaignDraft }) {
       {draft.message.text && (
         <Field label="Message"><div className="acw-textarea-mock">{draft.message.text}</div></Field>
       )}
+      {network && <AnalyticsPreview draft={draft} />}
       {draft.status === "submitted" && (
         <div className="acw-submitted">✓ Отправлено на модерацию</div>
       )}
     </>
+  );
+}
+
+// Analytics preview — concept of the per-platform reporting the Insights API will
+// fill after launch (publisher_platform breakdown). Clearly marked as a preview.
+function AnalyticsPreview({ draft }: { draft: CampaignDraft }) {
+  const rows = draft.platform_breakdown.length
+    ? draft.platform_breakdown
+    : [{ platform: "facebook", label: "Facebook", impressions: 0, reach: 0 }];
+  // Illustrative CTR/CPM per platform for the preview.
+  const ctr: Record<string, string> = { facebook: "1.2%", instagram: "1.6%", messenger: "0.8%", audience_network: "0.6%" };
+  return (
+    <Field label="Аналитика после запуска (предпросмотр)">
+      <div className="acw-analytics">
+        <div className="acw-analytics-head acw-analytics-row">
+          <span>Платформа</span><span>Показы</span><span>Охват</span><span>CTR</span>
+        </div>
+        {rows.map((p) => (
+          <div key={p.platform} className="acw-analytics-row">
+            <span>{p.label}</span>
+            <span>{fmt(p.impressions)}</span>
+            <span>{fmt(p.reach)}</span>
+            <span>{ctr[p.platform] ?? "1.0%"}</span>
+          </div>
+        ))}
+        <div className="acw-analytics-note">
+          Реальные данные подтянутся из Meta Insights (breakdown по платформам и плейсментам) после запуска.
+        </div>
+      </div>
+    </Field>
   );
 }
 
