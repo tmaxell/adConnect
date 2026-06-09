@@ -1,151 +1,117 @@
-# Meta Ads integration — concept & implementation plan
+# Meta Ads integration — prototype display concept
 
-How AdConnect launches and reports Meta (Facebook / Instagram / Messenger /
-WhatsApp / Audience Network) campaigns from its single advertiser cabinet, on top
-of the agency layer described in `Интеграция_внешних_рекламных_сетей.docx`. This
-doc focuses on **what we surface in the UI** and **how it maps to the Marketing
-API**, grounded in how mature aggregators do it.
+**Framing.** The goal here is a **convincing, high-quality-looking prototype** of the
+Meta integration — *not* a real Marketing-API build. Numbers are estimated, nothing
+is sent to Meta, "submit" only changes status. So this doc is mostly about **what we
+show and how it feels**, with just enough grounding in the real API/agency model to
+read as production-credible. The real adapter is a separate, later effort (§5).
 
 ---
 
-## 1. What the analogs teach us (UX to borrow)
+## 1. The reality we're emulating (so the visuals are credible)
 
-Tools that resell access to Meta through one cabinet are a control plane over the
-Marketing API. Patterns worth copying:
+### 1.1 Agency model — the client connects nothing
 
-- **Revealbot** — bulk editing + a rules engine (rolling averages, cross-metric
-  conditions, alerts), strong cross-account reporting. Take: automation rules,
-  one-screen reporting across accounts.
-- **Madgicx** — AI optimization layer; **one screen with unified ROAS / CPA across
-  all accounts**, custom attribution windows, real-time refresh. Take: a single
-  analytics surface with normalized KPIs.
-- **Smartly.io** — creative templating / dynamic product ads at enterprise scale.
-  Take: generate many creative variants from one brief (our creatives agent).
-- **AdEspresso** — approachable campaign builder with guided placement/audience
-  steps. Take: keep the wizard simple, sensible defaults, explain choices.
+The advertiser does **not** link their own Meta account. The operator runs everything
+through **its own Business Manager**: a dedicated ad account is provisioned per client
+under the operator's BM (two-tier Parent→Child BM), funded from the operator's
+consolidated billing / shared credit line and re-billed via the single wallet. The
+client keeps only their Page / Instagram / pixel. This is the "agency ad account"
+pattern used by white-label platforms (Vendasta, GoHighLevel, AdEspresso agency tier,
+DashClicks…) and the direct telecom analog — МТС Маркетолог reselling Telegram Ads.
 
-Common denominator: the user never opens Meta Ads Manager — they pick objective,
-audience, placements, budget and creative once; the platform translates to the API
-and shows **normalized, cross-placement reporting**.
+### 1.2 Can it be automated via API? Yes.
 
-## 2. Marketing API — what we use
+Provisioning and operation are programmatic with a **System User token** under the
+operator BM:
+- **Create ad accounts** under the business — `POST /{business-id}/adaccount`
+  (Business Manager API).
+- **Build campaigns** — Campaign (objective) → Ad Set (audience, placements, budget,
+  optimization) → Ad (creative) via the Marketing API.
+- **Audiences** — upload the operator segment as a **Custom Audience** (SHA-256
+  hashed phones), optional **Lookalike**.
+- **Analytics** — pull the **Insights API** with breakdowns.
 
-### 2.1 Object hierarchy (what the wizard builds)
+Gating (one-time): **Advanced Access** to `ads_management` + `business_management`,
+**Business Verification** and **App Review**. After that it's fully server-to-server.
+So a "no account needed, fully automated" experience is technically real — we just
+mock it in the prototype.
 
-```
-Ad Account (act_<id>, under operator Business Manager, agency model)
-└─ Campaign        → objective (ODAX: awareness | traffic | engagement | leads | sales)
-   └─ Ad Set       → audience (Custom/Lookalike + targeting), placements,
-                     budget & schedule, optimization_goal, bid
-      └─ Ad        → creative (primary text, headline, media, CTA, link)
-```
+### 1.3 What the Marketing API gives us (the data behind the visuals)
 
-Our `CampaignDraft` maps onto this: channel+objective → Campaign; segments +
-placements + budget → Ad Set; message/creative → Ad.
+- **Hierarchy**: Ad Account → Campaign (objective: awareness/traffic/engagement/
+  leads/sales) → Ad Set (audience + placements + budget + optimization) → Ad.
+- **Insights**: impressions, reach, frequency, clicks, link_clicks, ctr, spend, cpm,
+  cpc, conversions/leads, action_values (ROAS), with **breakdowns**:
+  `publisher_platform` (facebook/instagram/messenger/audience_network),
+  `platform_position` (feed/stories/reels), device, age, gender, region, action_type.
+- **Aggregator UX to borrow**: Smartly/Revealbot/Madgicx — single window, normalized
+  cross-placement reporting, sensible defaults.
 
-### 2.2 Audiences (landing the operator segment)
+## 2. What sells the prototype (visual checklist)
 
-- **Custom Audience** — the operator segment is exported as identifiers (phones),
-  **hashed SHA-256 on our side**, uploaded to the client ad account. Created per
-  ad account, shareable within the Business. Practical floors: ~1000 matched
-  profiles for stable delivery; match rate < 100% (we model ~60%); files > 10k
-  rows batch, processing up to ~24h.
-- **Lookalike Audience** — built from the Custom Audience as a source (min ~100
-  matched per country); created **in the destination account** so it optimizes on
-  that account's data. We expose this as a one-click "расширить похожей
-  аудиторией" toggle.
-- **Permissions / access** — `ads_management`, `ads_read`, `business_management`;
-  a **System User** token under the operator Business Manager. Agency model: the
-  client adds the operator's Business ID as a **partner** and shares the ad account
-  (Manage role); the operator assigns it to its System User and acts on the
-  client's behalf. WhatsApp is **Click-to-WhatsApp** — an ordinary Meta ad with a
-  WhatsApp CTA, not a separate channel.
+Every item below is **mock-driven** and either shipped (✓) or a quick next add (▢).
 
-### 2.3 Analytics (Insights API)
+- ✓ **Meta is a first-class channel** in the "Sending Channel" step (selectable,
+  alongside SMS/Email; Telegram/Google stay "Скоро").
+- ✓ **"Account not required" badge** — a green status line in Meta setup: *"Рекламный
+  аккаунт ведётся через кабинет оператора (Business Manager) — подключать свой не
+  нужно."* This single line communicates the whole agency model.
+- ✓ **Objective** auto-derived from the request (Лиды/Продажи/Трафик…), shown and
+  framed as the Campaign objective.
+- ✓ **Placements** as branded chips (Facebook / Instagram / Messenger / Audience
+  Network) with platform color dots; selected vs off.
+- ✓ **Audience landing** line — *"Custom Audience · совпадение ≈ 60% · ≈ N профилей"*
+  + a one-click **Lookalike** toggle.
+- ✓ **Auction economics** in the side panel — Custom Audience size, **CPM**, expected
+  **impressions**, and a **per-platform impression split** with color dots.
+- ✓ **Analytics preview** on confirmation — a per-platform table (Платформа / Показы /
+  Охват / CTR / CPM / Конверсии) with the note that real data comes from Meta Insights
+  (breakdown by platform, placement, demo, geo). This is the strongest "it's real"
+  signal; reach is kept < impressions so the numbers read correctly.
+- ▢ **Provisioning micro-animation** — a 1–2s "Готовим рекламный аккаунт оператора…"
+  → "✓ Аккаунт готов" on first Meta selection (pure UI theatre, sells automation).
+- ▢ **Normalized moderation timeline** on submit — *На модерации Meta → Одобрено →
+  Активна* chips with timestamps (mocked), reinforcing the unified-status story.
+- ▢ **Statistics screen** (sidebar "Statistics") — a mock dashboard with breakdown
+  toggles (by platform / placement position / age-gender) and a couple of charts, fed
+  by the same `platform_breakdown` shape. The flagship "Madgicx-like one screen".
+- ▢ **Creative preview** — render the chosen ad text inside a small FB/IG post mockup
+  (avatar, page name, image placeholder, CTA button) for a real-ad feel.
+- ▢ **WhatsApp as Click-to-WhatsApp** — show it as a CTA option inside Meta, not a
+  separate channel.
 
-- One endpoint reports across all placements; query at Account / Campaign / Ad Set
-  / Ad level. 70+ metrics: `impressions`, `reach`, `frequency`, `clicks`,
-  `link_clicks`, `ctr`, `unique_ctr`, `spend`, `cpm`, `cpc`, `actions` /
-  `conversions` / `leads`, `cost_per_action_type`, `action_values` (→ ROAS).
-- **Breakdowns** (the key to "разделение по платформам"):
-  `publisher_platform` (facebook / instagram / messenger / audience_network),
-  `platform_position` (feed / stories / reels / search), `impression_device`,
-  `age`, `gender`, `country` / `region`, `action_type`, time. Breakdowns multiply
-  rows, so combine deliberately.
-- Heavy/large pulls run as **async report jobs** with polling; per-account rate
-  limits apply. We sync Insights into our own store and show normalized,
-  per-platform reporting — independent of the network.
+## 3. Where it lives in the flow
 
-## 3. UI concept
+`Sending Channel` → pick **Meta** → (Meta setup: account badge, objective,
+placements, audience+lookalike) → `Segments` (operator audience → Custom Audience) →
+`Message` (creative, later with the post preview) → `Cost` (budget; panel shows CPM +
+impressions + per-platform split) → `Confirmation` (full summary + analytics preview
++ moderation timeline) → submit (status only).
 
-### 3.1 In the campaign wizard (build-time)
+## 4. Guardrails to keep the demo honest
 
-The "Sending Channel" step lets the user pick **Meta Ads**. Choosing it switches
-the wizard to the auction model and reveals Meta specifics:
+- Everything labeled as **estimate / preview / demo** where it isn't real.
+- **Submit changes status only** — no spend, no network call.
+- The "account not required / automated" claims describe the **target** model; the
+  prototype shows the experience, the real adapter is §5.
 
-- **Objective** — awareness / traffic / engagement / leads / sales (maps to ODAX
-  Campaign objective). Defaulted from the user's goal, editable.
-- **Audience** — operator segment → Custom Audience badge with match-rate and the
-  ~1000 floor warning; a **Lookalike** toggle to expand reach.
-- **Placements** — Facebook / Instagram / Messenger / Audience Network (WhatsApp
-  via Click-to-WhatsApp) as selectable chips; "Advantage+ (авто-плейсменты)" as
-  the recommended default.
-- **Cost** — daily/lifetime **budget** + schedule (no per-message). The reach
-  panel shows **Custom Audience size, CPM and expected impressions**, plus a
-  **per-platform split** of impressions across the selected placements.
-- **Creative** — primary text variants now; headline + media + CTA in Phase 1.
+## 5. Real integration (out of scope here, for later)
 
-### 3.2 Reporting surface (run-time) — the differentiator
-
-A single "Statistics" view per campaign, fed by Insights, with **breakdown
-toggles**: by **platform** (FB/IG/Messenger/AN), by **placement position**
-(feed/stories/reels), by age/gender/region. Normalized KPIs (impressions, reach,
-frequency, CTR, CPM, CPC, conversions, ROAS) and a plain-language summary from the
-analytics agent ("почему вырос CPM на этой неделе"). In the prototype we ship an
-**analytics preview** on the confirmation step — the per-platform table the live
-report will fill.
-
-### 3.3 Money & status (shared layer)
-
-Single wallet (RUB); on launch we reserve, fund the ad account (prepaid available
-funds / spend cap), reconcile actual spend daily from Insights. One normalized
-moderation status over Meta's review; rejection returns the reserve.
-
-## 4. Implementation plan (phased)
-
-- **Phase 0.5 — prototype (this change).** Meta is a selectable channel with the
-  auction model: objective, placements, lookalike toggle, Custom-Audience framing,
-  per-platform impression split, and an analytics preview on confirmation. All
-  estimated; submit only changes status. *No real API calls.*
-- **Phase 1 — real adapter (write path).** Operator Business Manager + System User
-  token; create Campaign/Ad Set/Ad via Marketing API in the client's ad account
-  (agency partner model); hash + upload the operator segment as a Custom Audience;
-  optional Lookalike; prepaid funding + wallet reservation; map placements to
-  `targeting.publisher_platforms` / positions.
-- **Phase 2 — analytics (read path).** Insights sync (async jobs) into our store;
-  the Statistics view with `publisher_platform` / `platform_position` / demo
-  breakdowns; daily spend reconciliation; the analytics agent for NL summaries.
-- **Phase 3 — optimization & moderation.** Rules engine (Revealbot-style),
-  Advantage+ budget, pre-moderation agent before submit, normalized status +
-  reasons, reserve return on rejection.
-
-## 5. What this prototype change ships
-
-- `CampaignDraft.meta` (`MetaSpec`: objective, placements, lookalike,
-  optimization_goal) + `platform_breakdown` (per-platform impressions/reach).
-- Forecast splits expected impressions across selected Meta placements.
-- Builder sets sensible Meta defaults (objective inferred from the goal, placements
-  FB+IG), offers a Lookalike toggle, and summarizes objective/placements.
-- Wizard: Meta setup block (objective, placement chips, lookalike), per-platform
-  breakdown in the reach panel and confirmation, and an **analytics preview** card.
+System User under the operator BM; `POST /{business-id}/adaccount` to provision; create
+Campaign/Ad Set/Ad; hash + upload Custom Audience (+ Lookalike); prepaid funding +
+wallet reservation/reconciliation; Insights sync (async jobs) into our store for the
+Statistics screen; normalized moderation status + reserve return on rejection. Gated by
+Advanced Access + Business Verification + App Review.
 
 ## 6. Sources
 
-- [Meta — Insights API](https://developers.facebook.com/docs/marketing-api/insights/) ·
+- [Insights API](https://developers.facebook.com/docs/marketing-api/insights/) ·
   [Breakdowns](https://developers.facebook.com/docs/marketing-api/insights/breakdowns/) ·
   [Insights metrics & hierarchy (Ryze)](https://www.get-ryze.ai/blog/meta-ads-api-insights-endpoint-campaigns-impressions-clicks-spend-leads)
-- [Custom Audience reference](https://developers.facebook.com/docs/marketing-api/reference/custom-audience/) ·
-  [Agency access levels (AdAmigo)](https://www.adamigo.ai/blog/meta-ads-api-access-levels-for-agencies) ·
-  [System User / multi-account (Wevion)](https://wevion.ai/en/blog/meta-business-manager-multiple-accounts/)
-- [Meta ads automation platforms compared (adlibrary)](https://adlibrary.com/guides/meta-ads-automation-platforms-compared) ·
-  [Meta ads builder comparison (adlibrary)](https://adlibrary.com/posts/meta-ads-builder-comparison)
+- [Create ad account / Business Manager API & Advanced Access (AdManage)](https://admanage.ai/blog/meta-ads-api) ·
+  [Custom Audience reference](https://developers.facebook.com/docs/marketing-api/reference/custom-audience/) ·
+  [Agency access levels (AdAmigo)](https://www.adamigo.ai/blog/meta-ads-api-access-levels-for-agencies)
+- [Agency ad account, how it works (Shopyads)](https://www.shopyads.io/en/blog/meta-agency-ad-account) ·
+  [2-tier Business Manager / consolidated billing (AdManage)](https://admanage.ai/blog/how-to-manage-multiple-facebook-ad-accounts) ·
+  [White-label Meta platforms (Madgicx)](https://madgicx.com/blog/white-label-meta-ad-platforms)

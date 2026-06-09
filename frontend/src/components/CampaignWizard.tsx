@@ -24,7 +24,15 @@ const PLACEMENT_LABEL: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram",
   messenger: "Messenger", audience_network: "Audience Network",
 };
+const PLATFORM_COLOR: Record<string, string> = {
+  facebook: "#1877F2", instagram: "#E4405F",
+  messenger: "#00B2FF", audience_network: "#5890FF",
+};
 const ALL_PLACEMENTS = ["facebook", "instagram", "messenger", "audience_network"];
+
+function PlatformDot({ platform }: { platform: string }) {
+  return <span className="acw-dot" style={{ background: PLATFORM_COLOR[platform] ?? "#94a3b8" }} />;
+}
 
 const STEP_LABELS: Record<Exclude<WizardStep, "ready">, string> = {
   channel: "Sending Channel",
@@ -88,7 +96,8 @@ function ReachPanel({ draft }: { draft: CampaignDraft }) {
             <div className="acw-platforms">
               {draft.platform_breakdown.map((p) => (
                 <div key={p.platform} className="acw-platform-row">
-                  <span>{p.label}</span><span>{fmt(p.impressions)}</span>
+                  <span className="acw-platform-name"><PlatformDot platform={p.platform} />{p.label}</span>
+                  <span>{fmt(p.impressions)}</span>
                 </div>
               ))}
             </div>
@@ -168,9 +177,14 @@ function ChannelStep({ draft }: { draft: CampaignDraft }) {
 // ── Segments step ────────────────────────────────────────────────────────────────
 
 function MetaSetup({ draft }: { draft: CampaignDraft }) {
+  const reach = fmt(draft.audience_reach || 0);
   return (
     <Field label="Meta setup">
       <div className="acw-meta-setup">
+        <div className="acw-meta-account">
+          <span className="acw-meta-account-dot" />
+          Рекламный аккаунт ведётся через кабинет оператора (Business Manager) — подключать свой не нужно.
+        </div>
         <div className="acw-meta-row">
           <span className="acw-meta-k">Цель</span>
           <span>{OBJECTIVE_LABEL[draft.meta.objective] ?? draft.meta.objective}</span>
@@ -178,12 +192,19 @@ function MetaSetup({ draft }: { draft: CampaignDraft }) {
         <div className="acw-meta-row">
           <span className="acw-meta-k">Плейсменты</span>
           <span className="acw-chips">
-            {ALL_PLACEMENTS.map((p) => (
-              <span key={p} className={`acw-chip${draft.meta.placements.includes(p) ? " acw-chip-accent" : " acw-chip-off"}`}>
-                {PLACEMENT_LABEL[p]}
-              </span>
-            ))}
+            {ALL_PLACEMENTS.map((p) => {
+              const on = draft.meta.placements.includes(p);
+              return (
+                <span key={p} className={`acw-chip${on ? " acw-chip-accent" : " acw-chip-off"}`}>
+                  <PlatformDot platform={p} />{PLACEMENT_LABEL[p]}
+                </span>
+              );
+            })}
           </span>
+        </div>
+        <div className="acw-meta-row">
+          <span className="acw-meta-k">Аудитория</span>
+          <span className="acw-meta-audience">Custom Audience · совпадение ≈ 60% · ≈ {reach} профилей</span>
         </div>
         <div className="acw-toggle-row">
           <span>Похожая аудитория (lookalike)</span>
@@ -354,24 +375,33 @@ function AnalyticsPreview({ draft }: { draft: CampaignDraft }) {
   const rows = draft.platform_breakdown.length
     ? draft.platform_breakdown
     : [{ platform: "facebook", label: "Facebook", impressions: 0, reach: 0 }];
-  // Illustrative CTR/CPM per platform for the preview.
-  const ctr: Record<string, string> = { facebook: "1.2%", instagram: "1.6%", messenger: "0.8%", audience_network: "0.6%" };
+  // Illustrative CTR / conversion rate per platform for the preview.
+  const ctr: Record<string, number> = { facebook: 0.012, instagram: 0.016, messenger: 0.008, audience_network: 0.006 };
+  const cvr: Record<string, number> = { facebook: 0.03, instagram: 0.035, messenger: 0.02, audience_network: 0.015 };
+  const cpm = draft.cpm || 0;
   return (
     <Field label="Аналитика после запуска (предпросмотр)">
       <div className="acw-analytics">
         <div className="acw-analytics-head acw-analytics-row">
-          <span>Платформа</span><span>Показы</span><span>Охват</span><span>CTR</span>
+          <span>Платформа</span><span>Показы</span><span>Охват</span><span>CTR</span><span>CPM</span><span>Конв.</span>
         </div>
-        {rows.map((p) => (
-          <div key={p.platform} className="acw-analytics-row">
-            <span>{p.label}</span>
-            <span>{fmt(p.impressions)}</span>
-            <span>{fmt(p.reach)}</span>
-            <span>{ctr[p.platform] ?? "1.0%"}</span>
-          </div>
-        ))}
+        {rows.map((p) => {
+          const clicks = Math.round(p.impressions * (ctr[p.platform] ?? 0.01));
+          const conversions = Math.round(clicks * (cvr[p.platform] ?? 0.025));
+          return (
+            <div key={p.platform} className="acw-analytics-row">
+              <span className="acw-platform-name"><PlatformDot platform={p.platform} />{p.label}</span>
+              <span>{fmt(p.impressions)}</span>
+              <span>{fmt(p.reach)}</span>
+              <span>{((ctr[p.platform] ?? 0.01) * 100).toFixed(1)}%</span>
+              <span>{cpm} ₽</span>
+              <span>{fmt(conversions)}</span>
+            </div>
+          );
+        })}
         <div className="acw-analytics-note">
-          Реальные данные подтянутся из Meta Insights (breakdown по платформам и плейсментам) после запуска.
+          Демо-данные. После запуска подтянутся из Meta Insights — breakdown по платформам,
+          плейсментам (Feed / Stories / Reels), полу, возрасту и гео.
         </div>
       </div>
     </Field>
