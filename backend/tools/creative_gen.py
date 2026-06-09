@@ -12,6 +12,12 @@ generated creative in the ad preview. `media_type="video"` adds a play affordanc
 
 from __future__ import annotations
 
+import uuid
+from pathlib import Path
+
+# Generated assets are written here and served by the API under /api/uploads.
+UPLOADS_DIR = Path(__file__).resolve().parent.parent / "data" / "uploads"
+
 # Aspect ratio (w, h) per placement format — mirrors Meta's recommended specs.
 _RATIO = {
     "feed": (1080, 1080),       # 1:1 square feed
@@ -93,3 +99,19 @@ def generate_svg(
         f'fill="rgba(255,255,255,0.85)">{brand_txt}</text>'
         f'</svg>'
     )
+
+
+def save_generated(
+    *,
+    fmt: str = "feed",
+    media_type: str = "image",
+    headline: str | None = None,
+    brand: str | None = None,
+    seed: int = 0,
+) -> str:
+    """Render a placeholder creative, persist it, and return its /api/uploads URL."""
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    svg = generate_svg(fmt=fmt, media_type=media_type, headline=headline, brand=brand, seed=seed)
+    name = f"{uuid.uuid4().hex}.svg"
+    (UPLOADS_DIR / name).write_text(svg, encoding="utf-8")
+    return f"/api/uploads/{name}"

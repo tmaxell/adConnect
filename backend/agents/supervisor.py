@@ -29,6 +29,8 @@ _ACTION_AGENT: dict[str, str] = {
     "toggle_lookalike": "campaign_builder",
     "suggest_audience": "campaign_builder",
     "generate_creatives": "campaign_builder",
+    "generate_creative_image": "campaign_builder",
+    "select_format": "campaign_builder",
     "select_creative": "campaign_builder",
     "skip_creatives": "campaign_builder",
     "submit_campaign": "campaign_builder",

@@ -114,6 +114,31 @@ async def test_meta_channel_flow(convo):
     assert saved["draft"]["channel"] == "meta"
 
 
+async def test_meta_creative_generation_and_format(convo):
+    # Reach the Meta message/creative step.
+    await convo.send("Собери рекламную кампанию для моего бизнеса")
+    await convo.send(action=action("select_channel", channel="meta"))
+    r = await convo.send(action=action("select_segment", segment_id="seg_active_mobile"))
+    assert convo.draft["step"] == "message"
+    # The creative step offers image/video generation + format switching.
+    ids = {a.id for a in r.actions}
+    assert "generate_creative_image" in ids and "select_format" in ids
+
+    # Switch the format to Reels → defaults the media type to video.
+    await convo.send(action=action("select_format", format="reels"))
+    assert convo.draft["meta"]["creative"]["format"] == "reels"
+    assert convo.draft["meta"]["creative"]["media_type"] == "video"
+
+    # Generate an image creative → media attached, ad text ensured.
+    r2 = await convo.send(action=action("generate_creative_image", media_type="image"))
+    cr = convo.draft["meta"]["creative"]
+    assert cr["media_type"] == "image"
+    assert cr["media_source"] == "generated"
+    assert cr["media_url"] and cr["media_url"].startswith("/api/uploads/")
+    assert convo.draft["message"]["text"]  # ad copy was auto-generated
+    assert any(a.id == "select_format" for a in r2.actions)
+
+
 async def test_audience_step_offered_even_when_prefilled(convo):
     # Product word must NOT auto-fill the audience and skip the segments step.
     await convo.send("Собери мне кампанию для фитнес клуба")

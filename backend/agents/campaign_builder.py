@@ -27,6 +27,7 @@ from typing import Any
 
 from agents.base import AgentContext, AgentResult
 from schemas import CampaignDraft, ChatAction
+from tools import creative_gen
 from tools import creatives as creatives_tool
 from tools import naming
 from tools.brief import merge_updates, update_draft_from_message
@@ -94,6 +95,21 @@ async def execute(ctx: AgentContext) -> AgentResult:
     return result
 
 
+# ── Meta creative helpers ───────────────────────────────────────────────────────
+
+_FORMAT_LABEL = {"feed": "Лента", "stories": "Истории", "reels": "Reels", "whatsapp": "Click-to-WhatsApp"}
+_FORMAT_DEFAULT_MEDIA = {"feed": "image", "stories": "image", "reels": "video", "whatsapp": "image"}
+
+
+def _available_formats(placements: list[str]) -> list[str]:
+    """Creative formats offered for the selected placements (mirrors the canvas)."""
+    out = ["feed"]
+    if "instagram" in placements or "facebook" in placements:
+        out += ["stories", "reels"]
+    out.append("whatsapp")  # Click-to-WhatsApp is a destination, always offerable
+    return out
+
+
 # ── Actions ───────────────────────────────────────────────────────────────────
 
 async def _handle_action(ctx: AgentContext, draft: CampaignDraft, action_id: str) -> AgentResult | None:
@@ -148,11 +164,24 @@ async def _handle_action(ctx: AgentContext, draft: CampaignDraft, action_id: str
             "Специальное предложение — подробности по ссылке."
         return None
 
+    if action_id == "select_format":
+        fmt = payload.get("format")
+        if fmt in ("feed", "stories", "reels", "whatsapp"):
+            draft.channel = "meta"
+            draft.meta.creative.format = fmt
+            if draft.meta.creative.media_type == "none":
+                draft.meta.creative.media_type = _FORMAT_DEFAULT_MEDIA[fmt]
+        return None
+
     if action_id == "suggest_audience":
         return await _suggest_audience(ctx, draft)
 
     if action_id == "generate_creatives":
         return await _generate_creatives(ctx, draft)
+
+    if action_id == "generate_creative_image":
+        media_type = "video" if payload.get("media_type") == "video" else "image"
+        return await _generate_meta_creative(ctx, draft, media_type=media_type)
 
     if action_id == "submit_campaign":
         return await _submit(ctx, draft)
@@ -202,6 +231,64 @@ async def _generate_creatives(ctx: AgentContext, draft: CampaignDraft) -> AgentR
     lines.append("\nВыберите вариант или пришлите свой текст.")
     apply_forecast(draft)
     return _wrap(draft, "\n".join(lines), actions, substep="message")
+
+
+async def _ensure_ad_text(ctx: AgentContext, draft: CampaignDraft) -> str:
+    """Guarantee the draft has ad copy (generate a variant if empty)."""
+    if draft.message.text:
+        return draft.message.text
+    if not draft.message.variants:
+        subject = naming.clean_subject(draft.product, draft.goal)
+        draft.message.variants = await creatives_tool.generate_creatives(
+            product=subject, goal=draft.goal, channel="meta",
+            audience=draft.segments.matched_segment_name or ", ".join(draft.segments.interests),
+        )
+    draft.message.text = draft.message.variants[0] if draft.message.variants else \
+        "Специальное предложение — подробности по ссылке."
+    return draft.message.text
+
+
+def _creative_actions(draft: CampaignDraft) -> list[ChatAction]:
+    """Format picks + media generation buttons for the Meta creative step."""
+    cr = draft.meta.creative
+    actions = [
+        ChatAction(id="generate_creative_image", label="Сгенерировать изображение",
+                   kind="primary", payload={"media_type": "image"}),
+        ChatAction(id="generate_creative_image", label="Сгенерировать видео",
+                   kind="default", payload={"media_type": "video"}),
+    ]
+    for fmt in _available_formats(draft.meta.placements):
+        if fmt == cr.format:
+            continue
+        actions.append(ChatAction(
+            id="select_format", label=f"Формат: {_FORMAT_LABEL[fmt]}",
+            kind="default", payload={"format": fmt},
+        ))
+    return actions
+
+
+async def _generate_meta_creative(ctx: AgentContext, draft: CampaignDraft, *, media_type: str = "image") -> AgentResult:
+    """Mock-generate a Meta creative (image/video) for the current format."""
+    draft.channel = "meta"
+    headline = await _ensure_ad_text(ctx, draft)
+    cr = draft.meta.creative
+    cr.media_type = media_type  # type: ignore[assignment]
+    cr.headline = headline
+    cr.media_url = creative_gen.save_generated(
+        fmt=cr.format, media_type=media_type, headline=headline, brand=draft.product,
+        seed=len(draft.message.variants) + (1 if media_type == "video" else 0),
+    )
+    cr.media_source = "generated"
+    await ctx.emit("tool_called", detail=f"generate_creative → {media_type}/{cr.format}")
+
+    kind = "видео" if media_type == "video" else "изображение"
+    msg = (
+        f"Готово: сгенерировал **{kind}** для формата «**{_FORMAT_LABEL[cr.format]}**».\n\n"
+        f"Текст объявления: «{headline}».\n\n"
+        f"Можно перегенерировать, сменить формат или загрузить своё медиа прямо на холсте."
+    )
+    apply_forecast(draft)
+    return _wrap(draft, msg, _creative_actions(draft), substep="message")
 
 
 async def _submit(ctx: AgentContext, draft: CampaignDraft) -> AgentResult:
@@ -351,15 +438,26 @@ def _audience_hint(draft: CampaignDraft) -> str:
 def _ask_message(draft: CampaignDraft) -> AgentResult:
     reach = f"{draft.audience_reach:,}".replace(",", " ")
     if is_network_channel(draft.channel):
-        ci = CHANNELS[draft.channel]
-        price_line = f"охват аудитории ≈ **{reach}**, размещение **{', '.join(ci.placements)}**, оплата за показы (CPM ≈ {draft.cpm:.0f} ₽)"
-        what = "**текст объявления**"
-    else:
-        price_line = f"охват ≈ **{reach}**, цена сообщения **{draft.price_per_message} ₽**"
-        what = "**текст сообщения**"
+        cr = draft.meta.creative
+        price_line = f"охват аудитории ≈ **{reach}**, оплата за показы (CPM ≈ {draft.cpm:.0f} ₽)"
+        formats = " · ".join(_FORMAT_LABEL[f] for f in _available_formats(draft.meta.placements))
+        msg = (
+            f"Аудитория готова: {price_line}.\n\n"
+            f"Теперь **креатив**. Текущий формат — «**{_FORMAT_LABEL[cr.format]}**» "
+            f"(доступны: {formats}). Сгенерирую текст и изображение/видео под вашу цель, "
+            f"либо соберите всё на холсте — выбор формата, загрузка и генерация медиа доступны там же."
+        )
+        actions = [
+            ChatAction(id="generate_creatives", label="Сгенерировать тексты", kind="primary", payload={}),
+            *_creative_actions(draft),
+            ChatAction(id="skip_creatives", label="Использовать типовой текст", kind="default", payload={}),
+        ]
+        return _wrap(draft, msg, actions, substep="message")
+
+    price_line = f"охват ≈ **{reach}**, цена сообщения **{draft.price_per_message} ₽**"
     msg = (
         f"Аудитория готова: {price_line}.\n\n"
-        f"Теперь {what}. Пришлите свой вариант или я сгенерирую несколько под вашу цель."
+        f"Теперь **текст сообщения**. Пришлите свой вариант или я сгенерирую несколько под вашу цель."
     )
     actions = [
         ChatAction(id="generate_creatives", label="Сгенерировать креативы", kind="primary", payload={}),

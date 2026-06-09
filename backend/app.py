@@ -197,14 +197,11 @@ async def generate_creative(session_id: str, request: CreativeGenerateRequest):
         raise HTTPException(status_code=404, detail="Session not found")
     draft = await _load_latest_draft(session_id)
     headline = request.headline or draft.message.text or draft.goal
-    svg = creative_gen.generate_svg(
+    url = creative_gen.save_generated(
         fmt=request.format, media_type=request.media_type,
         headline=headline, brand=request.brand or draft.product,
         seed=len(await store.list_artifacts(session_id=session_id)),
     )
-    name = f"{uuid.uuid4().hex}.svg"
-    (UPLOADS_DIR / name).write_text(svg, encoding="utf-8")
-    url = f"/api/uploads/{name}"
 
     draft.channel = "meta"
     draft.meta.creative.format = request.format  # type: ignore[assignment]
