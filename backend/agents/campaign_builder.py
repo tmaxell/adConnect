@@ -48,6 +48,7 @@ async def execute(ctx: AgentContext) -> AgentResult:
     await ctx.emit("step_started", detail=f"CampaignBuilder: action={action_id or 'message'}")
 
     draft = _load_draft(ctx)
+    prior_step = draft.step  # the step the user was answering this turn
     if draft.goal is None:
         goal = ctx.inputs.get("goal") or ctx.message
         draft.goal = (goal or "").strip()[:200] or None
@@ -59,6 +60,10 @@ async def execute(ctx: AgentContext) -> AgentResult:
         result = await _handle_action(ctx, draft, action_id)
     elif ctx.message.strip():
         await update_draft_from_message(draft, ctx.message, history=ctx.history)
+        # A free-text reply while on the segments step is the user describing their
+        # audience → count it as an explicit audience decision.
+        if prior_step == "segments":
+            draft.segments.audience_confirmed = True
 
     # 2. Standard path: forecast + advance the wizard to the next question.
     if result is None:
@@ -106,6 +111,12 @@ async def _handle_action(ctx: AgentContext, draft: CampaignDraft, action_id: str
             merge_updates(draft, dict(seg.spec))
             draft.segments.matched_segment_id = seg.id
             draft.segments.matched_segment_name = seg.name
+            draft.segments.audience_confirmed = True
+        return None
+
+    if action_id == "keep_audience":
+        # User chose to continue with the current/whole-base audience.
+        draft.segments.audience_confirmed = True
         return None
 
     if action_id == "select_creative":
@@ -271,13 +282,26 @@ def _ask_segments(draft: CampaignDraft) -> AgentResult:
             f" Для **{ci.label}** аудитория загружается как Custom Audience "
             f"(хеши телефонов, совпадает ≈{ci.match_rate * 100:.0f}%)."
         )
+    prefilled = _audience_hint(draft)
+    hint = f" Пока ориентируюсь на: {prefilled}." if prefilled else ""
     msg = (
-        f"Канал: **{CHANNELS[draft.channel].label}**. Теперь — **аудитория**.{landing}\n\n"
+        f"Канал: **{CHANNELS[draft.channel].label}**. Теперь — **аудитория**.{landing}{hint}\n\n"
         f"Опишите, кого хотим охватить (гео, возраст, интересы), либо я подберу сегмент "
         f"абонентской базы под вашу цель."
     )
-    actions = [ChatAction(id="suggest_audience", label="Подобрать аудиторию за меня", kind="primary", payload={})]
+    actions = [
+        ChatAction(id="suggest_audience", label="Подобрать аудиторию за меня", kind="primary", payload={}),
+        ChatAction(id="keep_audience", label="Продолжить с этой аудиторией", kind="default", payload={}),
+    ]
     return _wrap(draft, msg, actions)
+
+
+def _audience_hint(draft: CampaignDraft) -> str:
+    seg = draft.segments
+    parts = list(seg.geography) + list(seg.interests) + list(seg.age)
+    if seg.demographics != "all":
+        parts.append(seg.demographics)
+    return ", ".join(parts)
 
 
 def _ask_message(draft: CampaignDraft) -> AgentResult:

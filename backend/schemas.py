@@ -72,6 +72,11 @@ class SegmentSpec(BaseModel):
     triggers_enabled: bool = False
     matched_segment_id: str | None = None
     matched_segment_name: str | None = None
+    # The user actively decided on the audience (picked a segment, described it on
+    # the segments step, or chose to continue) — gates leaving the segments step,
+    # so the agent always *offers* to pick an audience even if some fields were
+    # pre-filled (heuristics/LLM inferring from the product).
+    audience_confirmed: bool = False
 
     def is_specified(self) -> bool:
         """True when the user gave at least one meaningful targeting signal."""
@@ -85,6 +90,10 @@ class SegmentSpec(BaseModel):
             or self.demographics != "all"
             or self.matched_segment_id
         )
+
+    def is_ready(self) -> bool:
+        """The segments step is complete only after an explicit audience decision."""
+        return self.audience_confirmed or bool(self.matched_segment_id)
 
 
 class MessageSpec(BaseModel):
@@ -141,7 +150,7 @@ class CampaignDraft(BaseModel):
         """First wizard step whose required slots are not yet filled."""
         if self.channel is None:
             return "channel"
-        if not self.segments.is_specified():
+        if not self.segments.is_ready():
             return "segments"
         if not self.message.is_specified():
             return "message"

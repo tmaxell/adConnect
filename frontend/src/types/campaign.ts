@@ -28,6 +28,7 @@ export interface SegmentSpec {
   triggers_enabled: boolean;
   matched_segment_id: string | null;
   matched_segment_name: string | null;
+  audience_confirmed: boolean;
 }
 
 export interface MessageSpec {

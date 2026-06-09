@@ -40,7 +40,7 @@ _INTEREST_ALIASES: dict[str, str] = {
     "travel": "travel", "путешеств": "travel", "туриз": "travel", "поездк": "travel",
     "movie": "movies", "кино": "movies", "фильм": "movies",
     "walk": "walking", "прогул": "walking", "ходьб": "walking",
-    "sport": "sport", "спорт": "sport", "фитнес": "sport",
+    "sport": "sport", "спорт": "sport",  # NB: 'фитнес' is a product, not an audience signal
     "game": "gaming", "игр": "gaming",
     "finance": "finance", "финанс": "finance", "инвест": "finance",
     "tech": "technology", "технолог": "technology", "гаджет": "technology",
@@ -138,8 +138,12 @@ Possible fields:
 - sender: string
 - budget: number (rubles)
 - messages_count: integer
-Omit any field you are unsure about. Never invent values. Example:
-{"product":"fitness club","goal":"attract new members","channel":"sms","geography":["Moscow"],"interests":["sport"]}"""
+Omit any field you are unsure about. Never invent values.
+IMPORTANT: do NOT infer audience parameters (geography, age, interests, income, demographics)
+from the product or business type — set them ONLY if the user explicitly describes the target
+audience. "Кампания для фитнес-клуба" → just {"product":"фитнес-клуб"} (no interests/age).
+Example with an explicit audience:
+{"product":"фитнес-клуб","goal":"привлечь новых клиентов","channel":"sms","geography":["Москва"],"age":["18-30"]}"""
 
 
 async def _llm_updates(message: str, history: list[dict[str, Any]] | None) -> dict[str, Any]:

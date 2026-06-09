@@ -112,3 +112,19 @@ async def test_meta_channel_flow(convo):
     assert convo.draft["status"] == "submitted"
     saved = convo.store.campaigns[-1]
     assert saved["draft"]["channel"] == "meta"
+
+
+async def test_audience_step_offered_even_when_prefilled(convo):
+    # Product word must NOT auto-fill the audience and skip the segments step.
+    await convo.send("Собери мне кампанию для фитнес клуба")
+    r = await convo.send(action=action("select_channel", channel="sms"))
+    # After choosing the channel we must land on segments and be offered to pick.
+    assert convo.draft["step"] == "segments"
+    assert convo.draft["segments"]["audience_confirmed"] is False
+    ids = {a.id for a in r.actions}
+    assert "suggest_audience" in ids and "keep_audience" in ids
+
+    # Continue with the current audience → only now advance to the message step.
+    await convo.send(action=action("keep_audience"))
+    assert convo.draft["segments"]["audience_confirmed"] is True
+    assert convo.draft["step"] == "message"

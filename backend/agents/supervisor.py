@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 _ACTION_AGENT: dict[str, str] = {
     "select_channel": "campaign_builder",
     "select_segment": "campaign_builder",
+    "keep_audience": "campaign_builder",
     "suggest_audience": "campaign_builder",
     "generate_creatives": "campaign_builder",
     "select_creative": "campaign_builder",
