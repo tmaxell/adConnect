@@ -159,6 +159,9 @@ through the same `tools/brief._canon_list_item` the agent uses (so `"Moscow"` an
 `save_generated(...)` renders a branded gradient **SVG** sized to the format
 (feed 1080×1080, stories/reels 1080×1920), writes it under `data/uploads/`, and
 returns `/api/uploads/<uuid>.svg`. `media_type="video"` adds a play affordance.
+A free-text **generation prompt** (`MetaCreative.prompt`, sent to `/creative/generate`)
+drives the rendered visual and seeds the placeholder, so distinct briefs yield
+distinct mock images — standing in for a real text-to-image call.
 Generated "video" is still an SVG placeholder, so the frontend renders generated
 assets as `<img>` and only real uploaded video files (`.mp4/.webm/…`) as `<video>`
 (`isVideoFile()` in `CampaignWizard.tsx`).

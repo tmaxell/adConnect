@@ -49,6 +49,7 @@ export interface MetaCreative {
   media_url: string | null;
   media_source: "upload" | "generated" | null;
   headline: string | null;
+  prompt: string | null;
 }
 
 export type AudienceMode = "advantage" | "manual";

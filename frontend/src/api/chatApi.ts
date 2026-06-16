@@ -273,7 +273,7 @@ export interface CreativeResult {
 /** Mock-generate a creative for the given format → returns a placeholder asset URL. */
 export async function generateCreative(
   sessionId: string,
-  params: { format: string; media_type: "image" | "video"; headline?: string | null },
+  params: { format: string; media_type: "image" | "video"; headline?: string | null; prompt?: string | null },
 ): Promise<CreativeResult> {
   const data = await http<unknown>(
     `/api/sessions/${encodeURIComponent(sessionId)}/creative/generate`,

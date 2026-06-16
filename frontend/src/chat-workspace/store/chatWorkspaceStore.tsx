@@ -42,7 +42,7 @@ interface ChatWorkspaceState {
   refreshSessions: () => Promise<void>;
   /** Clickable canvas: apply a patch to the draft (creates a session if needed). */
   updateDraft: (patch: Record<string, unknown>) => Promise<void>;
-  generateCreative: (params: { format: MetaFormat; media_type: MediaType; headline?: string | null }) => Promise<CreativeResult | null>;
+  generateCreative: (params: { format: MetaFormat; media_type: MediaType; headline?: string | null; prompt?: string | null }) => Promise<CreativeResult | null>;
   uploadCreative: (file: File) => Promise<CreativeResult | null>;
 }
 
@@ -297,7 +297,7 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
   );
 
   const generateCreativeAction = useCallback(
-    async (params: { format: MetaFormat; media_type: MediaType; headline?: string | null }) => {
+    async (params: { format: MetaFormat; media_type: MediaType; headline?: string | null; prompt?: string | null }) => {
       let sessionId = activeSessionId;
       if (!sessionId) sessionId = await createNewChat();
       userActedRef.current = true;
@@ -306,6 +306,7 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
           format: params.format,
           media_type: params.media_type === "video" ? "video" : "image",
           headline: params.headline ?? null,
+          prompt: params.prompt ?? null,
         });
         mergeDraftArtifact(result.draft);
         return result;

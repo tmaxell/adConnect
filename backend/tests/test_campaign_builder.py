@@ -129,12 +129,14 @@ async def test_meta_creative_generation_and_format(convo):
     assert convo.draft["meta"]["creative"]["format"] == "reels"
     assert convo.draft["meta"]["creative"]["media_type"] == "video"
 
-    # Generate an image creative → media attached, ad text ensured.
-    r2 = await convo.send(action=action("generate_creative_image", media_type="image"))
+    # Generate an image creative with a prompt → media + prompt persisted.
+    r2 = await convo.send(action=action(
+        "generate_creative_image", media_type="image", prompt="интерьер фитнес-клуба, утренний свет"))
     cr = convo.draft["meta"]["creative"]
     assert cr["media_type"] == "image"
     assert cr["media_source"] == "generated"
     assert cr["media_url"] and cr["media_url"].startswith("/api/uploads/")
+    assert cr["prompt"] == "интерьер фитнес-клуба, утренний свет"
     assert convo.draft["message"]["text"]  # ad copy was auto-generated
     assert any(a.id == "select_format" for a in r2.actions)
 

@@ -108,12 +108,13 @@ MediaType = Literal["none", "image", "video"]
 
 
 class MetaCreative(BaseModel):
-    """Creative for a Meta ad: format, media asset and headline."""
+    """Creative for a Meta ad: format, media asset, headline and generation prompt."""
     format: MetaFormat = "feed"
     media_type: MediaType = "none"
     media_url: str | None = None                     # uploaded or generated asset
     media_source: Literal["upload", "generated"] | None = None
     headline: str | None = None
+    prompt: str | None = None                        # brief used to generate the media
 
 
 # Ad Set audience-building method (Meta's four targeting modes collapse to two

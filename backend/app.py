@@ -143,6 +143,7 @@ class CreativeGenerateRequest(BaseModel):
     format: str = "feed"
     media_type: str = "image"       # "image" | "video"
     headline: str | None = None
+    prompt: str | None = None       # free-text generation brief
     brand: str | None = None
 
 
@@ -197,10 +198,14 @@ async def generate_creative(session_id: str, request: CreativeGenerateRequest):
         raise HTTPException(status_code=404, detail="Session not found")
     draft = await _load_latest_draft(session_id)
     headline = request.headline or draft.message.text or draft.goal
+    prompt = (request.prompt or "").strip() or None
+    # The generated visual reflects the prompt when given (else the ad copy); the
+    # prompt also seeds the placeholder so distinct briefs yield distinct images.
+    image_text = prompt or headline
+    seed = abs(hash(prompt)) % 997 if prompt else len(await store.list_artifacts(session_id=session_id))
     url = creative_gen.save_generated(
         fmt=request.format, media_type=request.media_type,
-        headline=headline, brand=request.brand or draft.product,
-        seed=len(await store.list_artifacts(session_id=session_id)),
+        headline=image_text, brand=request.brand or draft.product, seed=seed,
     )
 
     draft.channel = "meta"
@@ -208,6 +213,7 @@ async def generate_creative(session_id: str, request: CreativeGenerateRequest):
     draft.meta.creative.media_type = request.media_type  # type: ignore[assignment]
     draft.meta.creative.media_url = url
     draft.meta.creative.media_source = "generated"
+    draft.meta.creative.prompt = prompt
     if headline:
         draft.meta.creative.headline = headline
     content = await _recompute_and_save(session_id, draft)

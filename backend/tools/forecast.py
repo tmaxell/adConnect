@@ -20,15 +20,30 @@ from tools.catalog import CHANNELS, SEGMENTS_BY_ID
 # Full operator subscriber base (matches the "Audience reach" figure in the UI).
 FULL_BASE_REACH = 1_994_869
 
+# Operator subscribers reachable per region (sums roughly to the full base across RF).
+# Lets geo-targeted reach look realistic — a city can't out-reach its own population.
+_GEO_REACH: dict[str, int] = {
+    "Москва": 615_000,
+    "Санкт-Петербург": 312_000,
+    "Новосибирск": 96_000,
+    "Екатеринбург": 89_000,
+    "Казань": 78_000,
+    "Нижний Новгород": 74_000,
+    "Краснодар": 71_000,
+    "Иваново": 27_000,
+    "Россия": FULL_BASE_REACH,
+}
+_DEFAULT_CITY_REACH = 42_000   # unknown city → mid-size regional centre
+
 # Multiplicative narrowing factors applied when a dimension is targeted.
+# (Geography is not here — it's captured by the geo-based base reach above.)
 _NARROWING = {
-    "geography": 0.60,
-    "demographics": 0.50,     # men / women (not "all")
+    "demographics": 0.55,     # men / women (not "all")
     "age": 0.70,
-    "interests": 0.65,
-    "children_age": 0.50,
-    "monthly_income": 0.55,
-    "deposits_per_month": 0.55,
+    "interests": 0.72,
+    "children_age": 0.55,
+    "monthly_income": 0.60,
+    "deposits_per_month": 0.60,
 }
 
 # Per-message surcharge (₽) for paid targeting dimensions (messaging channels).
@@ -59,16 +74,23 @@ class Forecast:
 
 
 def _base_reach(seg: SegmentSpec) -> float:
-    """Segment reach (matched catalog segment caps the base; else the full base)."""
+    """Base reach before narrowing.
+
+    Priority: a matched catalog segment caps the base; else the selected regions
+    sum their reachable subscribers (capped at the full base); else the full base.
+    """
     if seg.matched_segment_id and seg.matched_segment_id in SEGMENTS_BY_ID:
         return float(SEGMENTS_BY_ID[seg.matched_segment_id].reach)
+    if seg.geography:
+        if "Россия" in seg.geography:
+            return float(FULL_BASE_REACH)
+        total = sum(_GEO_REACH.get(g, _DEFAULT_CITY_REACH) for g in seg.geography)
+        return float(min(total, FULL_BASE_REACH))
     return float(FULL_BASE_REACH)
 
 
 def _narrow(reach: float, seg: SegmentSpec) -> float:
     """Apply multiplicative narrowing for every specified targeting dimension."""
-    if seg.geography:
-        reach *= _NARROWING["geography"]
     if seg.demographics != "all":
         reach *= _NARROWING["demographics"]
     if seg.age:

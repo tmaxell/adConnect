@@ -192,7 +192,8 @@ async def _handle_action(ctx: AgentContext, draft: CampaignDraft, action_id: str
 
     if action_id == "generate_creative_image":
         media_type = "video" if payload.get("media_type") == "video" else "image"
-        return await _generate_meta_creative(ctx, draft, media_type=media_type)
+        prompt = payload.get("prompt") if isinstance(payload.get("prompt"), str) else None
+        return await _generate_meta_creative(ctx, draft, media_type=media_type, prompt=prompt)
 
     if action_id == "submit_campaign":
         return await _submit(ctx, draft)
@@ -278,16 +279,20 @@ def _creative_actions(draft: CampaignDraft) -> list[ChatAction]:
     return actions
 
 
-async def _generate_meta_creative(ctx: AgentContext, draft: CampaignDraft, *, media_type: str = "image") -> AgentResult:
+async def _generate_meta_creative(ctx: AgentContext, draft: CampaignDraft, *,
+                                  media_type: str = "image", prompt: str | None = None) -> AgentResult:
     """Mock-generate a Meta creative (image/video) for the current format."""
     draft.channel = "meta"
     headline = await _ensure_ad_text(ctx, draft)
     cr = draft.meta.creative
+    prompt = (prompt or cr.prompt or "").strip() or None
+    image_text = prompt or headline
     cr.media_type = media_type  # type: ignore[assignment]
     cr.headline = headline
+    cr.prompt = prompt
     cr.media_url = creative_gen.save_generated(
-        fmt=cr.format, media_type=media_type, headline=headline, brand=draft.product,
-        seed=len(draft.message.variants) + (1 if media_type == "video" else 0),
+        fmt=cr.format, media_type=media_type, headline=image_text, brand=draft.product,
+        seed=(abs(hash(prompt)) % 997 if prompt else len(draft.message.variants) + (1 if media_type == "video" else 0)),
     )
     cr.media_source = "generated"
     await ctx.emit("tool_called", detail=f"generate_creative → {media_type}/{cr.format}")

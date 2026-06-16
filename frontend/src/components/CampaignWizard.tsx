@@ -496,7 +496,7 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
   const m = draft.meta;
   const reach = fmt(draft.audience_reach || 0);
   const advantage = m.audience_mode === "advantage";
-  const suggestHint = advantage ? "Подсказка для ИИ Meta" : undefined;
+  const suggestHint = advantage ? "Подсказка для AdConnect Copilot" : undefined;
   return (
     <>
       <div className="acw-meta-account">
@@ -532,13 +532,13 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
           onChange={(v) => api.update({ audience_mode: v })}
           disabled={api.busy}
           options={[
-            { value: "advantage", label: "Advantage+ (ИИ Meta)" },
+            { value: "advantage", label: "Advantage+ (AdConnect Copilot)" },
             { value: "manual", label: "Ручная настройка" },
           ]}
         />
         <div className="acw-hint">
           {advantage
-            ? "Meta использует данные оператора (Custom Audience) и ваши подсказки (гео, возраст, интересы), чтобы найти больше похожих покупателей."
+            ? "AdConnect Copilot использует данные оператора (Custom Audience) и ваши подсказки (гео, возраст, интересы), чтобы найти больше похожих покупателей."
             : "Вы полностью управляете таргетингом: источник, гео, возраст, интересы и плейсменты."}
         </div>
         <AudienceGauge reach={draft.audience_reach || 0} />
@@ -551,7 +551,7 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
           <span>Данные оператора · совпадение ≈ 60% · ≈ {reach} профилей</span>
         </div>
         {advantage ? (
-          <div className="acw-hint">Lookalike-моделирование встроено в Advantage+ — Meta сама расширит аудиторию.</div>
+          <div className="acw-hint">Lookalike-моделирование встроено в Advantage+ — AdConnect Copilot сам расширит аудиторию.</div>
         ) : (
           <>
             <div className="acw-toggle-row">
@@ -625,7 +625,7 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
         </div>
         <div className="acw-hint">
           {m.advantage_placements
-            ? "Meta сама распределит показы по площадкам для лучшего результата (рекомендуется)."
+            ? "AdConnect Copilot распределит показы по площадкам для лучшего результата (рекомендуется)."
             : "Выберите площадки вручную — нажмите, чтобы включить или выключить."}
         </div>
         <div className="acw-chips">
@@ -714,6 +714,8 @@ function SegmentsStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) 
 function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   const { generateCreative, uploadCreative } = useChatWorkspaceStore();
   const [busyKind, setBusyKind] = useState<"image" | "video" | "upload" | null>(null);
+  const [prompt, setPrompt] = useState(draft.meta.creative.prompt ?? "");
+  useEffect(() => { setPrompt(draft.meta.creative.prompt ?? ""); }, [draft.meta.creative.prompt]);
   const fileRef = useRef<HTMLInputElement>(null);
   const creative = draft.meta.creative;
   // Under Advantage+ placements Meta runs across all platforms → offer all formats.
@@ -724,7 +726,7 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
 
   const gen = async (media_type: MediaType) => {
     setBusyKind(media_type === "video" ? "video" : "image");
-    try { await generateCreative({ format: creative.format, media_type, headline }); }
+    try { await generateCreative({ format: creative.format, media_type, headline, prompt: prompt.trim() || null }); }
     finally { setBusyKind(null); }
   };
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -767,6 +769,16 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
           onCommit={(v) => api.update({ message_text: v, headline: v })}
           multiline
           disabled={disabled}
+        />
+      </Field>
+
+      <Field label="Промпт для генерации" hint="Опишите, что изобразить на фото или видео — затем нажмите «Сгенерировать».">
+        <textarea
+          className="acw-textarea-edit"
+          value={prompt}
+          placeholder="Например: интерьер фитнес-клуба, утренний свет, улыбающиеся люди на тренировке…"
+          disabled={disabled}
+          onChange={(e) => setPrompt(e.target.value)}
         />
       </Field>
 
