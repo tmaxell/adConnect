@@ -39,6 +39,25 @@ class FakeStore:
     async def set_campaign_id(self, *, session_id: str, campaign_id: int | None) -> None:
         self.session_campaign_id[session_id] = campaign_id
 
+    @staticmethod
+    def _full(c: dict[str, Any]) -> dict[str, Any]:
+        d = c.get("draft") or {}
+        return {
+            "id": c["id"], "name": d.get("name") or "Кампания", "channel": d.get("channel"),
+            "status": c.get("status", "active"), "audience_reach": int(d.get("audience_reach") or 0),
+            "estimated_cost": float(d.get("estimated_cost") or 0.0),
+            "budget": (d.get("cost") or {}).get("budget"), "draft": d,
+        }
+
+    async def list_campaigns_full(self) -> list[dict[str, Any]]:
+        return [self._full(c) for c in reversed(self.campaigns)]
+
+    async def get_campaign(self, campaign_id: int) -> dict[str, Any] | None:
+        for c in self.campaigns:
+            if c["id"] == campaign_id:
+                return self._full(c)
+        return None
+
     async def save_artifact(
         self,
         *,

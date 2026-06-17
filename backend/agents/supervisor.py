@@ -42,6 +42,7 @@ _INTENT_AGENT: dict[str, str] = {
     "build_campaign": "campaign_builder",
     "suggest_segments": "campaign_builder",
     "generate_creatives": "campaign_builder",
+    "analytics_report": "analyst",
     "documentation_qa": "docs_qa",
 }
 

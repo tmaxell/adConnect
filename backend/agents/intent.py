@@ -23,10 +23,12 @@ IntentName = Literal[
     "build_campaign",
     "suggest_segments",
     "generate_creatives",
+    "analytics_report",
     "documentation_qa",
 ]
 
-_VALID_INTENTS = {"build_campaign", "suggest_segments", "generate_creatives", "documentation_qa"}
+_VALID_INTENTS = {"build_campaign", "suggest_segments", "generate_creatives",
+                  "analytics_report", "documentation_qa"}
 
 
 @dataclass(slots=True)
@@ -62,6 +64,14 @@ _RULES: list[tuple[IntentName, list[re.Pattern[str]]]] = [
             re.compile(r"\b(generate|create|write)\s+(\w+\s+){0,3}(creative|ad copy|banner|message|text)", re.IGNORECASE),
         ],
     ),
+    (
+        "analytics_report",
+        [
+            re.compile(r"\b(отч[её]т|аналитик|статистик|метрик|эффективност|показател|результат\w*\s+кампани)", re.IGNORECASE),
+            re.compile(r"\bкак\s+(иду[тщ]|идёт|идет|обстоят|дела|поживают|работа\w*|перформ)", re.IGNORECASE),
+            re.compile(r"\b(report|analytics|stats|metrics|performance)\b", re.IGNORECASE),
+        ],
+    ),
 ]
 
 
@@ -82,6 +92,7 @@ Intents:
 - build_campaign     — пользователь просит СОЗДАТЬ/собрать рекламную кампанию (повелительное наклонение). НЕ вопрос «как».
 - suggest_segments   — подобрать аудиторию / сегмент (без полной кампании).
 - generate_creatives — сгенерировать тексты/креативы объявления.
+- analytics_report    — показать аналитику/отчёт/статистику по кампаниям, метрики, эффективность, «как идут кампании».
 - documentation_qa   — вопрос «как / что / почему», объяснение функций платформы, гайды.
 
 Правило: «как создать кампанию / how to create» — это ВСЕГДА documentation_qa.
@@ -93,6 +104,8 @@ Few-shot:
 - «Что такое сегмент аудитории?» → documentation_qa
 - «Подбери аудиторию для доставки еды» → suggest_segments
 - «Сгенерируй три варианта SMS-текста» → generate_creatives
+- «Покажи отчёт по кампаниям» → analytics_report
+- «Как идут мои кампании? что улучшить?» → analytics_report
 
 Ответ — строго JSON одной строкой без markdown:
 {"intent":"<one>","confidence":<0..1>,"reason":"<=80 chars"}"""

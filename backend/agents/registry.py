@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agents import campaign_builder, docs_qa
+from agents import analyst, campaign_builder, docs_qa
 from agents.base import AgentProtocol, FunctionAgent
 
 
@@ -18,6 +18,7 @@ def _make(module) -> AgentProtocol:
 _AGENTS: dict[str, AgentProtocol] = {
     campaign_builder.NAME: _make(campaign_builder),
     docs_qa.NAME: _make(docs_qa),
+    analyst.NAME: _make(analyst),
 }
 
 

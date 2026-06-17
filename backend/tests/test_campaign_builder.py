@@ -141,6 +141,30 @@ async def test_meta_creative_generation_and_format(convo):
     assert any(a.id == "select_format" for a in r2.actions)
 
 
+async def test_analytics_report_routes_to_analyst(convo):
+    # No campaigns yet → analyst nudges to build one.
+    r0 = await convo.send("Покажи отчёт по кампаниям")
+    assert r0.metadata.get("stage") == "analytics"
+    assert "нет" in r0.assistant_message.lower()
+
+    # Seed a campaign, then the report carries real figures.
+    await convo.store.save_campaign(session_id=convo.session_id, status="active", draft={
+        "name": "Фитнес — лиды", "channel": "meta", "audience_reach": 50_000,
+        "estimated_cost": 30_000, "cost": {"budget": 30_000}, "cpm": 300,
+        "estimated_impressions": 100_000,
+        "meta": {"objective": "leads", "advantage_placements": True, "placements": ["facebook"]},
+    })
+    r1 = await convo.send("Покажи отчёт по кампаниям")
+    assert r1.metadata.get("stage") == "analytics"
+    assert "₽" in r1.assistant_message and "CTR" in r1.assistant_message
+
+    # Mentioning the campaign by name → its detailed report + advice.
+    r2 = await convo.send("Как дела у кампании Фитнес?")
+    assert r2.metadata.get("campaign_id") == 1
+    assert "Что улучшить" in r2.assistant_message
+    assert any(a.id == "open_analytics" for a in r2.actions)
+
+
 async def test_audience_step_offered_even_when_prefilled(convo):
     # Product word must NOT auto-fill the audience and skip the segments step.
     await convo.send("Собери мне кампанию для фитнес клуба")
