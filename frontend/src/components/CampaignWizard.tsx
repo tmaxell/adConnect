@@ -72,8 +72,10 @@ const INTEREST_LABEL: Record<string, string> = {
 const mapInterests = (items: string[]) => items.map((t) => INTEREST_LABEL[t] ?? t);
 const ALL_PLACEMENTS = ["facebook", "instagram", "messenger", "whatsapp", "audience_network"];
 
-// Tone presets for ad-copy generation.
+// Tone presets for ad-copy generation. "recommended" lets the Copilot pick the
+// most effective angle and is the default.
 const TONES: Array<{ id: string; label: string }> = [
+  { id: "recommended", label: "✦ Рекомендуемый Copilot" },
   { id: "selling", label: "Продающий" },
   { id: "friendly", label: "Дружелюбный" },
   { id: "business", label: "Деловой" },
@@ -540,7 +542,7 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
           onChange={(v) => api.update({ audience_mode: v })}
           disabled={api.busy}
           options={[
-            { value: "advantage", label: "Advantage+ (AdConnect Copilot)" },
+            { value: "advantage", label: "AdConnect Copilot" },
             { value: "manual", label: "Ручная настройка" },
           ]}
         />
@@ -559,7 +561,7 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
           <span>Данные оператора · совпадение ≈ 60% · ≈ {reach} профилей</span>
         </div>
         {advantage ? (
-          <div className="acw-hint">Lookalike-моделирование встроено в Advantage+ — AdConnect Copilot сам расширит аудиторию.</div>
+          <div className="acw-hint">Lookalike-моделирование встроено в AdConnect Copilot — он сам расширит аудиторию.</div>
         ) : (
           <>
             <div className="acw-toggle-row">
@@ -628,7 +630,7 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
       {/* Placements — Advantage+ (auto) by default, switchable to manual. */}
       <Field label="Плейсменты">
         <div className="acw-toggle-row">
-          <span>Автоматические плейсменты (Advantage+)</span>
+          <span>Автоматические плейсменты (AdConnect Copilot)</span>
           <Toggle on={m.advantage_placements} onClick={() => api.update({ advantage_placements: !m.advantage_placements })} disabled={api.busy} />
         </div>
         <div className="acw-hint">
@@ -722,7 +724,7 @@ function SegmentsStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) 
 function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   const { generateCreative, generateCopy, uploadCreative } = useChatWorkspaceStore();
   const [busyKind, setBusyKind] = useState<"image" | "video" | "upload" | "copy" | null>(null);
-  const [tone, setTone] = useState("selling");
+  const [tone, setTone] = useState("recommended");
   const [prompt, setPrompt] = useState(draft.meta.creative.prompt ?? "");
   useEffect(() => { setPrompt(draft.meta.creative.prompt ?? ""); }, [draft.meta.creative.prompt]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -827,7 +829,7 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
         </div>
       </Field>
 
-      <Field label="Изображение / видео по промпту" hint="Опишите, что изобразить — затем нажмите «Сгенерировать фото/видео» ниже.">
+      <Field label="Изображение / видео по промпту" hint="Опишите, что изобразить, либо оставьте пустым — ✦ AdConnect Copilot подберёт визуал сам.">
         <textarea
           className="acw-textarea-edit"
           value={prompt}
@@ -839,6 +841,7 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
 
       <div className="acw-creative-grid">
         <Field label="Медиа">
+          <div className="acw-copilot-tag">✦ Генерация на базе AdConnect Copilot</div>
           <div className="acw-media-actions">
             <button type="button" className="acw-btn acw-btn-ghost acw-media-btn" disabled={disabled} onClick={() => gen("image")}>
               {busyKind === "image" ? <Spinner /> : <IconPhoto />}Сгенерировать фото
@@ -896,7 +899,7 @@ function MessageStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   const network = isNetworkChannel(draft.channel);
   if (network) return <MetaCreativeStep draft={draft} api={api} />;
   const { generateCopy } = useChatWorkspaceStore();
-  const [tone, setTone] = useState("selling");
+  const [tone, setTone] = useState("recommended");
   const [genBusy, setGenBusy] = useState(false);
   const m = draft.message;
   const busy = api.busy || genBusy;

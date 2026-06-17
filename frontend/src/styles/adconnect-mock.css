@@ -689,3 +689,6 @@
 .acw-copy-card:disabled { cursor: default; opacity: 0.7; }
 .acw-copy-card-badge { font-size: 11px; font-weight: 700; color: var(--ac-accent); }
 .acw-copy-card-text { font-size: 13px; line-height: 1.4; color: var(--ac-text); }
+
+/* Copilot-recommended marker (media generation) */
+.acw-copilot-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ac-accent); background: var(--ac-accent-soft); border-radius: 6px; padding: 4px 10px; margin-bottom: 10px; }
