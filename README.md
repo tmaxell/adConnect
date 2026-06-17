@@ -3,7 +3,9 @@
 Prototype of the AdConnect AI features: a floating chat widget over the product UI,
 backed by a multi-agent system whose flagship **campaign-builder agent** assembles a
 full advertising campaign from a natural-language request (channel → audience →
-creatives → budget → confirmation).
+creatives → budget → confirmation). A second **analyst agent** reports campaign
+performance and recommends fixes — the same data powers the **Analytics** page and
+the Copilot reports (one backend source, `tools/analytics.py`).
 
 ```
 frontend/   Vite + React widget + AdConnect product canvas (live campaign wizard)
@@ -46,7 +48,7 @@ cd frontend && npm install && npm run dev   # http://localhost:5173 (proxies /ap
 ## Test
 
 ```bash
-cd backend && source .venv/bin/activate && pytest    # 45 tests
+cd backend && source .venv/bin/activate && pytest    # 57 tests
 ```
 
 ## Try it (SMB scenarios)
@@ -56,6 +58,7 @@ The agent is tuned for general small-business advertisers. Example prompts:
 - "Создай SMS-кампанию для моего фитнес-клуба, чтобы привлечь новых клиентов"
 - "Подбери аудиторию для службы доставки готовой еды"
 - "Собери кампанию по продвижению автосервиса"
+- "Покажи отчёт по кампаниям" / "Как идёт кампания …? что улучшить?"
 
 As you converse, the product canvas fills the campaign wizard live, step by step.
 
@@ -65,3 +68,10 @@ step choose a placement format (Лента / Истории / Reels / Click-to-W
 generate or upload an image/video, with a live ad preview. The canvas and the agent
 edit the same draft. See `docs/creative_generation_and_backend.md` for the Meta
 creative-API research, the interactive endpoints, and the production-scaling sketch.
+
+The **Statistics** screen is an analytics dashboard: account-level KPIs (spend,
+impressions, CTR, results, cost per result), a 14-day trend chart, a per-platform
+split and a per-campaign table; drill into a campaign for its metrics, ROAS and
+recommendations, with a button to get Copilot's fix suggestions. The metrics follow
+Meta's Insights set and are derived deterministically from the stored campaigns by
+`tools/analytics.py` — the single source shared by the page and the chat reports.
