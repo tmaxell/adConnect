@@ -41,11 +41,19 @@ Rules:
 - Email: each variant is a single subject-style line, slightly longer is fine.
 - Meta (Facebook/Instagram/WhatsApp): 1-2 short sentences of primary ad text with a clear call to action.
 - No emojis, no placeholders, no markdown. Each variant must stand alone.
-Return STRICT JSON: {{"variants": ["...", "...", "..."]}}"""
+{tone_line}Return STRICT JSON: {{"variants": ["...", "...", "..."]}}"""
+
+# Tone presets steer the copy without changing the structure.
+_TONE_HINT = {
+    "selling": "Тон: продающий, с явной выгодой и сильным призывом к действию.",
+    "friendly": "Тон: дружелюбный и тёплый, на «вы», простыми словами.",
+    "business": "Тон: деловой и сдержанный, без восклицаний.",
+    "short": "Тон: максимально короткий и ёмкий, без лишних слов.",
+}
 
 
 async def _llm_variants(
-    product: str, goal: str, channel: str, audience: str, n: int
+    product: str, goal: str, channel: str, audience: str, n: int, tone: str | None = None
 ) -> list[str]:
     try:
         from langchain_core.messages import HumanMessage, SystemMessage
@@ -53,6 +61,7 @@ async def _llm_variants(
         from llm import get_llm
 
         llm = get_llm(temperature=0.7)
+        tone_line = (_TONE_HINT.get(tone or "", "") + "\n") if tone else ""
         prompt = (
             f"Product: {product or '—'}\n"
             f"Goal: {goal or '—'}\n"
@@ -60,7 +69,7 @@ async def _llm_variants(
             f"Audience: {audience or '—'}"
         )
         result = await llm.ainvoke([
-            SystemMessage(content=_LLM_SYSTEM.format(n=n)),
+            SystemMessage(content=_LLM_SYSTEM.format(n=n, tone_line=tone_line)),
             HumanMessage(content=prompt),
         ])
         raw = getattr(result, "content", str(result))
@@ -96,6 +105,7 @@ async def generate_creatives(
     channel: str,
     audience: str | None = None,
     n: int = 3,
+    tone: str | None = None,
     use_llm: bool = True,
 ) -> list[str]:
     """Return `n` creative variants for the campaign (LLM, else templates)."""
@@ -103,7 +113,7 @@ async def generate_creatives(
     goal = goal or ""
     variants: list[str] = []
     if use_llm:
-        variants = await _llm_variants(product, goal, channel, audience or "", n)
+        variants = await _llm_variants(product, goal, channel, audience or "", n, tone)
     if not variants:
         variants = _fallback_variants(product, goal, channel)[:n]
     if channel == "sms":

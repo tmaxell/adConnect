@@ -113,6 +113,17 @@ class CampaignRow(BaseModel):
     health: Literal["good", "warning", "critical"] = "good"
 
 
+class ChannelMetric(BaseModel):
+    channel: str
+    label: str
+    campaign_count: int = 0
+    spend: float = 0.0
+    impressions: int = 0
+    clicks: int = 0
+    results: int = 0
+    share: float = 0.0                  # % of total spend
+
+
 class AnalyticsSummary(BaseModel):
     spend: float = 0.0
     impressions: int = 0
@@ -127,6 +138,7 @@ class AnalyticsSummary(BaseModel):
     campaign_count: int = 0
     series: list[MetricPoint] = Field(default_factory=list)
     platforms: list[PlatformMetric] = Field(default_factory=list)
+    channels: list[ChannelMetric] = Field(default_factory=list)
     campaigns: list[CampaignRow] = Field(default_factory=list)
     recommendations: list[Recommendation] = Field(default_factory=list)
 

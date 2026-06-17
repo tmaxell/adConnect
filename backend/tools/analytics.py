@@ -24,11 +24,14 @@ from schemas import (
     AnalyticsSummary,
     CampaignAnalytics,
     CampaignRow,
+    ChannelMetric,
     MetricPoint,
     PlatformMetric,
     Recommendation,
 )
 from tools.forecast import _PLATFORM_LABEL, _PLATFORM_WEIGHT
+
+_CHANNEL_LABEL = {"sms": "SMS", "email": "Email", "meta": "Meta"}
 
 # Meta-style benchmarks used for the recommendations.
 _CTR_BENCHMARK = 1.15          # % — Facebook feed average
@@ -348,6 +351,22 @@ def account_summary(campaigns: list[dict]) -> AnalyticsSummary:
     for pf in by_platform.values():
         pf.ctr = round(pf.clicks / pf.impressions * 100, 2) if pf.impressions else 0.0
     summary.platforms = sorted(by_platform.values(), key=lambda x: -x.impressions)
+
+    # Distribution by channel (SMS / Email / Meta …).
+    by_channel: dict[str, ChannelMetric] = {}
+    for m in metrics:
+        ch = m.channel or "other"
+        row = by_channel.get(ch)
+        if row is None:
+            row = by_channel[ch] = ChannelMetric(channel=ch, label=_CHANNEL_LABEL.get(ch, ch.title()))
+        row.campaign_count += 1
+        row.spend = round(row.spend + m.spend, 2)
+        row.impressions += m.impressions
+        row.clicks += m.clicks
+        row.results += m.results
+    for row in by_channel.values():
+        row.share = round(row.spend / summary.spend * 100, 1) if summary.spend else 0.0
+    summary.channels = sorted(by_channel.values(), key=lambda x: -x.spend)
 
     summary.campaigns = [
         CampaignRow(

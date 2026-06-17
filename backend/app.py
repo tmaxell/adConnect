@@ -34,7 +34,7 @@ from agents.base import AgentContext
 from agents.supervisor import handle as supervisor_handle
 from db import ChatStore, init_db
 from schemas import CampaignDraft, ChatAction, ChatArtifact, ChatTraceEvent
-from tools import analytics, creative_gen, naming
+from tools import analytics, creative_gen, creatives as creatives_tool, naming
 from tools.draft_ops import apply_patch
 from tools.forecast import apply_forecast
 
@@ -182,6 +182,12 @@ class CreativeGenerateRequest(BaseModel):
     brand: str | None = None
 
 
+class CopyGenerateRequest(BaseModel):
+    tone: str | None = None         # selling | friendly | business | short
+    brief: str | None = None        # what to advertise (overrides product/goal)
+    n: int = 3
+
+
 async def _load_latest_draft(session_id: str) -> CampaignDraft:
     artifacts = await store.list_artifacts(session_id=session_id)
     drafts = [a for a in artifacts if a.get("type") == "campaign_draft"]
@@ -253,6 +259,25 @@ async def generate_creative(session_id: str, request: CreativeGenerateRequest):
         draft.meta.creative.headline = headline
     content = await _recompute_and_save(session_id, draft)
     return {"url": url, "media_type": request.media_type, "draft": content}
+
+
+@app.post("/api/sessions/{session_id}/creative/copy")
+async def generate_copy(session_id: str, request: CopyGenerateRequest):
+    """Generate ad-copy variants for the creative step (tone-aware), on the page."""
+    if await store.ensure_session(session_id=session_id) is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    draft = await _load_latest_draft(session_id)
+    brief = (request.brief or "").strip() or None
+    audience = draft.segments.matched_segment_name or ", ".join(draft.segments.interests)
+    variants = await creatives_tool.generate_creatives(
+        product=brief or draft.product, goal=draft.goal, channel=draft.channel or "meta",
+        audience=audience, n=max(1, min(5, request.n)), tone=request.tone,
+    )
+    draft.message.variants = variants
+    if brief and not draft.product:
+        draft.product = brief
+    content = await _recompute_and_save(session_id, draft)
+    return {"variants": variants, "draft": content}
 
 
 @app.post("/api/sessions/{session_id}/creative/upload")

@@ -79,3 +79,19 @@ def test_account_summary_aggregates():
 def test_empty_account_summary():
     s = account_summary([])
     assert s.campaign_count == 0 and s.campaigns == []
+
+
+def test_channel_distribution():
+    s = account_summary([
+        _camp(cid=1, channel="meta"), _camp(cid=2, channel="meta"),
+        _camp(cid=3, channel="sms"),
+        {"id": 4, "name": "Email промо", "channel": "email", "audience_reach": 1000,
+         "estimated_cost": 30_000, "budget": 30_000, "draft": {"meta": {}}},
+    ])
+    by = {c.channel: c for c in s.channels}
+    assert by["meta"].campaign_count == 2
+    assert {"meta", "sms", "email"} <= set(by)
+    assert by["meta"].label == "Meta" and by["email"].label == "Email"
+    assert round(sum(c.share for c in s.channels)) == 100
+    # sorted by spend descending → meta (2 campaigns) first
+    assert s.channels[0].channel == "meta"
