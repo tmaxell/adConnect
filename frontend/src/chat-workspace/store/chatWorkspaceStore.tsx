@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import {
   ChatApiError,
   createChat,
+  generateCopy,
   generateCreative,
   getChat,
   listChats,
@@ -12,6 +13,7 @@ import {
   type ChatArtifact,
   type ChatMessage,
   type ChatSession,
+  type CopyResult,
   type CreativeResult,
 } from "../../api/chatApi";
 import type { CampaignFlow } from "../../types/api";
@@ -47,6 +49,7 @@ interface ChatWorkspaceState {
   /** Clickable canvas: apply a patch to the draft (creates a session if needed). */
   updateDraft: (patch: Record<string, unknown>) => Promise<void>;
   generateCreative: (params: { format: MetaFormat; media_type: MediaType; headline?: string | null; prompt?: string | null }) => Promise<CreativeResult | null>;
+  generateCopy: (params: { tone?: string | null; brief?: string | null; n?: number }) => Promise<CopyResult | null>;
   uploadCreative: (file: File) => Promise<CreativeResult | null>;
 }
 
@@ -328,6 +331,23 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
     [activeSessionId, createNewChat, mergeDraftArtifact],
   );
 
+  const generateCopyAction = useCallback(
+    async (params: { tone?: string | null; brief?: string | null; n?: number }) => {
+      let sessionId = activeSessionId;
+      if (!sessionId) sessionId = await createNewChat();
+      userActedRef.current = true;
+      try {
+        const result = await generateCopy(sessionId, params);
+        mergeDraftArtifact(result.draft);
+        return result;
+      } catch (e) {
+        setError(toError(e));
+        return null;
+      }
+    },
+    [activeSessionId, createNewChat, mergeDraftArtifact],
+  );
+
   const uploadCreativeAction = useCallback(
     async (file: File) => {
       let sessionId = activeSessionId;
@@ -370,6 +390,7 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
       refreshSessions,
       updateDraft,
       generateCreative: generateCreativeAction,
+      generateCopy: generateCopyAction,
       uploadCreative: uploadCreativeAction,
     }),
     [
@@ -393,6 +414,7 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
       refreshSessions,
       updateDraft,
       generateCreativeAction,
+      generateCopyAction,
       uploadCreativeAction,
     ],
   );

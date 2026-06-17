@@ -288,6 +288,27 @@ export async function generateCreative(
   };
 }
 
+export interface CopyResult {
+  variants: string[];
+  draft: CampaignDraft;
+}
+
+/** Generate tone-aware ad-copy variants for the creative step (text generation). */
+export async function generateCopy(
+  sessionId: string,
+  params: { tone?: string | null; brief?: string | null; n?: number },
+): Promise<CopyResult> {
+  const data = await http<unknown>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/creative/copy`,
+    { method: "POST", body: JSON.stringify(params) },
+  );
+  const o = isObject(data) ? data : {};
+  return {
+    variants: Array.isArray(o.variants) ? o.variants.map((v) => asString(v)) : [],
+    draft: o.draft as CampaignDraft,
+  };
+}
+
 /** Upload a real image/video file → attaches it to the draft's Meta creative. */
 export async function uploadCreative(sessionId: string, file: File): Promise<CreativeResult> {
   const form = new FormData();

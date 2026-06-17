@@ -16,6 +16,7 @@ import { useChatWorkspaceStore } from "../chat-workspace/store/chatWorkspaceStor
 import type {
   AnalyticsSummary,
   CampaignAnalytics,
+  ChannelMetric,
   MetricPoint,
   PlatformMetric,
   Recommendation,
@@ -31,6 +32,9 @@ const OBJECTIVE_LABEL: Record<string, string> = {
   leads: "Лиды", sales: "Продажи",
 };
 const CHANNEL_LABEL: Record<string, string> = { sms: "SMS", email: "Email", meta: "Meta" };
+const CHANNEL_COLOR: Record<string, string> = {
+  meta: "#5257ff", sms: "#0ea5e9", email: "#f59e0b", other: "#94a3b8",
+};
 
 const num = (n: number) => n.toLocaleString("ru-RU").replace(/,/g, " ");
 const money = (n: number) => `${num(Math.round(n))} ₽`;
@@ -92,6 +96,46 @@ function PlatformBars({ platforms }: { platforms: PlatformMetric[] }) {
           <span className="ana-platform-val">{num(p.impressions)} · CTR {p.ctr}%</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Channel-distribution donut (by spend share) + legend. */
+function ChannelDonut({ channels }: { channels: ChannelMetric[] }) {
+  if (!channels.length) return null;
+  const R = 54, SW = 22, C = 2 * Math.PI * R;
+  let offset = 0;
+  const segs = channels.map((c) => {
+    const len = (c.share / 100) * C;
+    const seg = { c, dash: `${len} ${C - len}`, off: -offset, color: CHANNEL_COLOR[c.channel] ?? CHANNEL_COLOR.other };
+    offset += len;
+    return seg;
+  });
+  return (
+    <div className="ana-channels">
+      <svg viewBox="0 0 140 140" className="ana-donut">
+        <g transform="rotate(-90 70 70)">
+          <circle cx="70" cy="70" r={R} fill="none" stroke="#eef2f7" strokeWidth={SW} />
+          {segs.map((s) => (
+            <circle key={s.c.channel} cx="70" cy="70" r={R} fill="none" stroke={s.color}
+              strokeWidth={SW} strokeDasharray={s.dash} strokeDashoffset={s.off} />
+          ))}
+        </g>
+        <text x="70" y="66" textAnchor="middle" className="ana-donut-num">{channels.length}</text>
+        <text x="70" y="84" textAnchor="middle" className="ana-donut-cap">канала</text>
+      </svg>
+      <div className="ana-channel-legend">
+        {channels.map((c) => (
+          <div key={c.channel} className="ana-channel-row">
+            <span className="ana-channel-name">
+              <i className="ana-sq" style={{ background: CHANNEL_COLOR[c.channel] ?? CHANNEL_COLOR.other }} />
+              {c.label}
+            </span>
+            <span className="ana-channel-share">{c.share}%</span>
+            <span className="ana-channel-val">{money(c.spend)} · {c.campaign_count} камп. · {num(c.results)} рез.</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -211,6 +255,13 @@ function Summary({ summary, onSelect }: { summary: AnalyticsSummary; onSelect: (
       </div>
 
       {summary.recommendations.map((r, i) => <RecoCard key={i} rec={r} />)}
+
+      {summary.channels.length > 0 && (
+        <>
+          <div className="ana-section-title">Распределение по каналам</div>
+          <div className="ana-card-box"><ChannelDonut channels={summary.channels} /></div>
+        </>
+      )}
 
       <div className="ana-section-title">Динамика за 14 дней (все кампании)</div>
       <LineChart series={summary.series} />

@@ -662,3 +662,30 @@
   .ana-tr { grid-template-columns: 2fr 1fr 1fr; }
   .ana-tr span:nth-child(n+4) { display: none; }
 }
+
+/* Channel distribution (donut) */
+.ana-card-box { background: var(--ac-surface); border: 1px solid var(--ac-border); border-radius: 12px; padding: 16px; }
+.ana-channels { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.ana-donut { width: 140px; height: 140px; flex-shrink: 0; }
+.ana-donut-num { font-size: 26px; font-weight: 700; fill: var(--ac-text); }
+.ana-donut-cap { font-size: 11px; fill: var(--ac-text-muted); }
+.ana-channel-legend { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 10px; }
+.ana-channel-row { display: grid; grid-template-columns: 110px 48px 1fr; align-items: center; gap: 10px; font-size: 13px; }
+.ana-channel-name { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.ana-channel-share { font-weight: 700; }
+.ana-channel-val { color: var(--ac-text-secondary); text-align: right; }
+
+/* Ad-copy generation (tone + variant cards) */
+.acw-gen-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.acw-tone { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.acw-tone-chip { border: 1px solid var(--ac-border); background: var(--ac-surface); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; color: var(--ac-text-secondary); }
+.acw-tone-chip.on { border-color: var(--ac-accent); color: var(--ac-accent); background: var(--ac-accent-soft); font-weight: 600; }
+.acw-tone-chip:disabled { cursor: default; opacity: 0.6; }
+.acw-gen-btn { display: inline-flex; align-items: center; gap: 7px; }
+.acw-copy-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 12px; }
+.acw-copy-card { display: flex; flex-direction: column; gap: 6px; text-align: left; border: 1px solid var(--ac-border); border-radius: 10px; padding: 12px; background: var(--ac-surface); cursor: pointer; transition: border-color .12s, box-shadow .12s; }
+.acw-copy-card:not(:disabled):hover { border-color: var(--ac-accent); }
+.acw-copy-card.on { border-color: var(--ac-accent); box-shadow: 0 0 0 1px var(--ac-accent); background: var(--ac-accent-soft); }
+.acw-copy-card:disabled { cursor: default; opacity: 0.7; }
+.acw-copy-card-badge { font-size: 11px; font-weight: 700; color: var(--ac-accent); }
+.acw-copy-card-text { font-size: 13px; line-height: 1.4; color: var(--ac-text); }

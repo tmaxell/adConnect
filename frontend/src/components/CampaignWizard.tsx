@@ -72,6 +72,14 @@ const INTEREST_LABEL: Record<string, string> = {
 const mapInterests = (items: string[]) => items.map((t) => INTEREST_LABEL[t] ?? t);
 const ALL_PLACEMENTS = ["facebook", "instagram", "messenger", "whatsapp", "audience_network"];
 
+// Tone presets for ad-copy generation.
+const TONES: Array<{ id: string; label: string }> = [
+  { id: "selling", label: "Продающий" },
+  { id: "friendly", label: "Дружелюбный" },
+  { id: "business", label: "Деловой" },
+  { id: "short", label: "Краткий" },
+];
+
 // Creative formats (placement positions / Click-to-WhatsApp destination).
 const FORMAT_ORDER: MetaFormat[] = ["feed", "stories", "reels", "whatsapp"];
 const FORMAT_META: Record<MetaFormat, { label: string; ratio: string; hint: string }> = {
@@ -712,8 +720,9 @@ function SegmentsStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) 
 // ── Message / creative step ──────────────────────────────────────────────────────
 
 function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
-  const { generateCreative, uploadCreative } = useChatWorkspaceStore();
-  const [busyKind, setBusyKind] = useState<"image" | "video" | "upload" | null>(null);
+  const { generateCreative, generateCopy, uploadCreative } = useChatWorkspaceStore();
+  const [busyKind, setBusyKind] = useState<"image" | "video" | "upload" | "copy" | null>(null);
+  const [tone, setTone] = useState("selling");
   const [prompt, setPrompt] = useState(draft.meta.creative.prompt ?? "");
   useEffect(() => { setPrompt(draft.meta.creative.prompt ?? ""); }, [draft.meta.creative.prompt]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -736,6 +745,11 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
     setBusyKind("upload");
     try { await uploadCreative(file); } finally { setBusyKind(null); }
   };
+  const genCopy = async () => {
+    setBusyKind("copy");
+    try { await generateCopy({ tone }); } finally { setBusyKind(null); }
+  };
+  const variants = draft.message.variants;
 
   const disabled = api.busy || busyKind !== null;
   return (
@@ -762,17 +776,58 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
         </div>
       </Field>
 
-      <Field label="Текст объявления">
-        <EditableText
-          value={draft.message.text}
-          placeholder="Заголовок / основной текст объявления…"
-          onCommit={(v) => api.update({ message_text: v, headline: v })}
-          multiline
-          disabled={disabled}
-        />
+      <Field label="Текст объявления" hint="Выберите тон и сгенерируйте варианты — затем выберите лучший и при необходимости отредактируйте.">
+        <div className="acw-gen-row">
+          <div className="acw-tone">
+            {TONES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`acw-tone-chip${tone === t.id ? " on" : ""}`}
+                disabled={disabled}
+                onClick={() => setTone(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="acw-btn acw-btn-primary acw-gen-btn" disabled={disabled} onClick={genCopy}>
+            {busyKind === "copy" ? <Spinner /> : "✦"} Сгенерировать варианты
+          </button>
+        </div>
+
+        {variants.length > 0 && (
+          <div className="acw-copy-cards">
+            {variants.map((v, i) => {
+              const selected = v === draft.message.text;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  className={`acw-copy-card${selected ? " on" : ""}`}
+                  disabled={disabled}
+                  onClick={() => api.update({ message_text: v, headline: v })}
+                >
+                  <span className="acw-copy-card-badge">{selected ? "✓ Выбран" : `Вариант ${i + 1}`}</span>
+                  <span className="acw-copy-card-text">{v}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="acw-sub-field">
+          <EditableText
+            value={draft.message.text}
+            placeholder="Текст объявления — выберите вариант выше или впишите свой…"
+            onCommit={(v) => api.update({ message_text: v, headline: v })}
+            multiline
+            disabled={disabled}
+          />
+        </div>
       </Field>
 
-      <Field label="Промпт для генерации" hint="Опишите, что изобразить на фото или видео — затем нажмите «Сгенерировать».">
+      <Field label="Изображение / видео по промпту" hint="Опишите, что изобразить — затем нажмите «Сгенерировать фото/видео» ниже.">
         <textarea
           className="acw-textarea-edit"
           value={prompt}
@@ -833,24 +888,6 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
         </div>
       </div>
 
-      {draft.message.variants.length > 0 && (
-        <Field label="Сгенерированные варианты текста">
-          <div className="acw-variants">
-            {draft.message.variants.map((v, i) => (
-              <button
-                key={i}
-                type="button"
-                className={`acw-variant${v === draft.message.text ? " selected" : ""}`}
-                disabled={disabled}
-                onClick={() => api.update({ message_text: v, headline: v })}
-              >
-                <span className="acw-variant-idx">{i + 1}</span>
-                <span>{v}</span>
-              </button>
-            ))}
-          </div>
-        </Field>
-      )}
     </>
   );
 }
@@ -858,33 +895,51 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
 function MessageStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   const network = isNetworkChannel(draft.channel);
   if (network) return <MetaCreativeStep draft={draft} api={api} />;
+  const { generateCopy } = useChatWorkspaceStore();
+  const [tone, setTone] = useState("selling");
+  const [genBusy, setGenBusy] = useState(false);
   const m = draft.message;
+  const busy = api.busy || genBusy;
+  const genCopy = async () => {
+    setGenBusy(true);
+    try { await generateCopy({ tone }); } finally { setGenBusy(false); }
+  };
   return (
     <>
       <Field label="Отправитель">
-        <EditableText value={m.sender} placeholder="Имя отправителя" onCommit={(v) => api.update({ sender: v })} disabled={api.busy} />
+        <EditableText value={m.sender} placeholder="Имя отправителя" onCommit={(v) => api.update({ sender: v })} disabled={busy} />
       </Field>
-      <Field label="Текст сообщения">
-        <EditableText value={m.text} placeholder="Текст сообщения…" onCommit={(v) => api.update({ message_text: v })} multiline disabled={api.busy} />
-      </Field>
-      {m.variants.length > 0 && (
-        <Field label="Сгенерированные варианты">
-          <div className="acw-variants">
-            {m.variants.map((v, i) => (
-              <button
-                key={i}
-                type="button"
-                className={`acw-variant${v === m.text ? " selected" : ""}`}
-                disabled={api.busy}
-                onClick={() => api.update({ message_text: v })}
-              >
-                <span className="acw-variant-idx">{i + 1}</span>
-                <span>{v}</span>
-              </button>
+      <Field label="Текст сообщения" hint="Выберите тон и сгенерируйте варианты — затем выберите лучший или впишите свой.">
+        <div className="acw-gen-row">
+          <div className="acw-tone">
+            {TONES.map((t) => (
+              <button key={t.id} type="button" className={`acw-tone-chip${tone === t.id ? " on" : ""}`}
+                disabled={busy} onClick={() => setTone(t.id)}>{t.label}</button>
             ))}
           </div>
-        </Field>
-      )}
+          <button type="button" className="acw-btn acw-btn-primary acw-gen-btn" disabled={busy} onClick={genCopy}>
+            {genBusy ? <Spinner /> : "✦"} Сгенерировать варианты
+          </button>
+        </div>
+        {m.variants.length > 0 && (
+          <div className="acw-copy-cards">
+            {m.variants.map((v, i) => {
+              const selected = v === m.text;
+              return (
+                <button key={i} type="button" className={`acw-copy-card${selected ? " on" : ""}`}
+                  disabled={busy} onClick={() => api.update({ message_text: v })}>
+                  <span className="acw-copy-card-badge">{selected ? "✓ Выбран" : `Вариант ${i + 1}`}</span>
+                  <span className="acw-copy-card-text">{v}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <div className="acw-sub-field">
+          <EditableText value={m.text} placeholder="Текст сообщения — выберите вариант выше или впишите свой…"
+            onCommit={(v) => api.update({ message_text: v })} multiline disabled={busy} />
+        </div>
+      </Field>
     </>
   );
 }

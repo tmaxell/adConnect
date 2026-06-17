@@ -68,6 +68,17 @@ export interface CampaignRow {
   health: Severity;
 }
 
+export interface ChannelMetric {
+  channel: string;
+  label: string;
+  campaign_count: number;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  results: number;
+  share: number;
+}
+
 export interface AnalyticsSummary {
   spend: number;
   impressions: number;
@@ -82,6 +93,7 @@ export interface AnalyticsSummary {
   campaign_count: number;
   series: MetricPoint[];
   platforms: PlatformMetric[];
+  channels: ChannelMetric[];
   campaigns: CampaignRow[];
   recommendations: Recommendation[];
 }
