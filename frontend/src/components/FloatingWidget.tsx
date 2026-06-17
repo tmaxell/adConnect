@@ -334,6 +334,7 @@ export function FloatingWidget() {
     selectSession,
     createNewChat,
     sendMessage,
+    setView,
   } = useChatWorkspaceStore();
 
   const [mode, setMode] = useState<WidgetMode>("fab");
@@ -371,6 +372,12 @@ export function FloatingWidget() {
     if (action.id === "clarify_reply") {
       const text = String((action.payload || {}).message || action.label || "");
       if (text) void sendMessage(text);
+      return;
+    }
+    // open_analytics — навигация на страницу аналитики, без обращения к бэкенду.
+    if (action.id === "open_analytics") {
+      const cid = (action.payload || {}).campaign_id;
+      setView("analytics", typeof cid === "number" ? cid : null);
       return;
     }
     const label = ACTION_LABELS[action.id] ?? action.label;

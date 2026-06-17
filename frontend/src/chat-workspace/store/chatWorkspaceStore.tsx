@@ -32,6 +32,10 @@ interface ChatWorkspaceState {
   /** Bumps only on agent/session-driven draft changes (not local canvas edits),
    *  so the wizard can follow the agent without yanking the view during clicks. */
   draftRev: number;
+  /** Which product screen is shown in the canvas. */
+  view: "campaigns" | "analytics";
+  analyticsCampaignId: number | null;
+  setView: (view: "campaigns" | "analytics", campaignId?: number | null) => void;
   loadingSessions: boolean;
   loadingMessages: boolean;
   sending: boolean;
@@ -115,8 +119,14 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draftRev, setDraftRev] = useState(0);
+  const [view, setViewState] = useState<"campaigns" | "analytics">("campaigns");
+  const [analyticsCampaignId, setAnalyticsCampaignId] = useState<number | null>(null);
   const userActedRef = useRef(false);
   const bumpDraft = useCallback(() => setDraftRev((r) => r + 1), []);
+  const setView = useCallback((v: "campaigns" | "analytics", campaignId: number | null = null) => {
+    setViewState(v);
+    setAnalyticsCampaignId(campaignId);
+  }, []);
 
   const refreshSessions = useCallback(async (silent = false) => {
     setLoadingSessions(true);
@@ -347,6 +357,9 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
       draftFlow,
       campaignDraft,
       draftRev,
+      view,
+      analyticsCampaignId,
+      setView,
       loadingSessions,
       loadingMessages,
       sending,
@@ -367,6 +380,9 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
       draftFlow,
       campaignDraft,
       draftRev,
+      view,
+      analyticsCampaignId,
+      setView,
       loadingSessions,
       loadingMessages,
       sending,

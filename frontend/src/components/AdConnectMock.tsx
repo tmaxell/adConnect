@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { listCampaigns, type CampaignSummary } from "../api/chatApi";
 import { useChatWorkspaceStore } from "../chat-workspace/store/chatWorkspaceStore";
 import { CampaignWizard } from "./CampaignWizard";
+import { AnalyticsPage } from "./AnalyticsPage";
 import { LogoFull } from "./Logo";
 
 const USER_EMAIL = "ivani_gp@starcorp.com";
@@ -194,16 +195,20 @@ function AdcTopbar() {
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
 function AdcSidebar() {
+  const { view, setView } = useChatWorkspaceStore();
   return (
     <aside className="ac-sidebar">
       <nav className="ac-side-nav">
-        <div className="ac-side-item ac-side-item-active">
+        <button
+          type="button"
+          className={`ac-side-item${view === "campaigns" ? " ac-side-item-active" : ""}`}
+          onClick={() => setView("campaigns")}
+        >
           <span className="ac-side-item-main">
             <CampaignsIcon />
             <span>Ad Campaigns</span>
           </span>
-          <button className="ac-side-add" type="button" title="New campaign"><PlusBox /></button>
-        </div>
+        </button>
         <div className="ac-side-item">
           <span className="ac-side-item-main">
             <SegmentsIcon />
@@ -211,12 +216,16 @@ function AdcSidebar() {
           </span>
           <button className="ac-side-add" type="button" title="New segment"><PlusBox /></button>
         </div>
-        <div className="ac-side-item">
+        <button
+          type="button"
+          className={`ac-side-item${view === "analytics" ? " ac-side-item-active" : ""}`}
+          onClick={() => setView("analytics", null)}
+        >
           <span className="ac-side-item-main">
             <StatisticsIcon />
             <span>Statistics</span>
           </span>
-        </div>
+        </button>
       </nav>
 
       <div className="ac-side-footer">
@@ -358,14 +367,16 @@ function AdcCampaignsScreen() {
 // ── Shell ──────────────────────────────────────────────────────────────────────
 
 export function AdConnectMock() {
-  const { campaignDraft } = useChatWorkspaceStore();
+  const { campaignDraft, view } = useChatWorkspaceStore();
   return (
     <div className="ac-shell">
       <AdcTopbar />
       <div className="ac-body">
         <AdcSidebar />
         <main className="ac-main">
-          {campaignDraft ? <CampaignWizard draft={campaignDraft} /> : <AdcCampaignsScreen />}
+          {view === "analytics"
+            ? <AnalyticsPage />
+            : campaignDraft ? <CampaignWizard draft={campaignDraft} /> : <AdcCampaignsScreen />}
         </main>
       </div>
     </div>

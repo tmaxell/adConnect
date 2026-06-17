@@ -576,3 +576,89 @@
 .acw-mi { width: 16px; height: 16px; flex-shrink: 0; }
 .acw-spin { animation: acw-spin 0.7s linear infinite; }
 @keyframes acw-spin { to { transform: rotate(360deg); } }
+
+/* ── Analytics page ───────────────────────────────────────────────────────────── */
+.ana { width: 100%; max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.ana-header { display: flex; flex-direction: column; gap: 2px; }
+.ana-h1 { font-size: 22px; font-weight: 700; margin: 0; }
+.ana-h1-sub { font-size: 14px; color: var(--ac-text-secondary); margin: 0; }
+.ana-loading, .ana-chart-empty { color: var(--ac-text-muted); font-size: 14px; padding: 24px 0; }
+
+.ana-empty { background: var(--ac-surface); border: 1px solid var(--ac-border); border-radius: 12px; padding: 40px 24px; text-align: center; }
+.ana-empty-title { font-size: 16px; font-weight: 600; }
+.ana-empty-sub { font-size: 14px; color: var(--ac-text-secondary); margin-top: 6px; }
+
+/* KPI cards */
+.ana-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.ana-kpi { background: var(--ac-surface); border: 1px solid var(--ac-border); border-radius: 12px; padding: 14px 16px; }
+.ana-kpi-label { font-size: 12px; color: var(--ac-text-secondary); }
+.ana-kpi-value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+.ana-kpi-sub { font-size: 12px; color: var(--ac-text-muted); margin-top: 2px; }
+
+.ana-section-title { font-size: 15px; font-weight: 600; margin-top: 4px; }
+
+/* Chart */
+.ana-chart { background: var(--ac-surface); border: 1px solid var(--ac-border); border-radius: 12px; padding: 16px; }
+.ana-chart-legend { display: flex; gap: 20px; font-size: 13px; color: var(--ac-text-secondary); margin-bottom: 8px; }
+.ana-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.ana-chart-svg { width: 100%; height: 200px; display: block; }
+.ana-chart-x { display: flex; justify-content: space-between; font-size: 11px; color: var(--ac-text-muted); margin-top: 4px; }
+
+/* Platform bars */
+.ana-platforms { background: var(--ac-surface); border: 1px solid var(--ac-border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.ana-platform-row { display: grid; grid-template-columns: 150px 1fr 150px; align-items: center; gap: 12px; font-size: 13px; }
+.ana-platform-name { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+.ana-sq { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+.ana-bar-track { background: #eef2f7; border-radius: 999px; height: 10px; overflow: hidden; }
+.ana-bar { height: 100%; border-radius: 999px; }
+.ana-platform-val { text-align: right; color: var(--ac-text-secondary); }
+
+/* Recommendations */
+.ana-recos { display: flex; flex-direction: column; gap: 10px; }
+.ana-reco { border: 1px solid var(--ac-border); border-left-width: 4px; border-radius: 10px; padding: 12px 14px; background: var(--ac-surface); }
+.ana-reco-critical { border-left-color: #ef4444; }
+.ana-reco-warning { border-left-color: #f59e0b; }
+.ana-reco-good { border-left-color: #22c55e; }
+.ana-reco-head { display: flex; align-items: center; gap: 8px; }
+.ana-reco-icon { font-size: 13px; }
+.ana-reco-title { font-size: 14px; font-weight: 600; }
+.ana-reco-fix { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--ac-accent); background: var(--ac-accent-soft); border-radius: 6px; padding: 2px 8px; }
+.ana-reco-detail { font-size: 13px; color: var(--ac-text-secondary); margin-top: 5px; line-height: 1.4; }
+
+.ana-reco-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.ana-cta { border: 0; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 600; color: #fff; background: var(--ac-accent); cursor: pointer; }
+.ana-cta:hover { filter: brightness(1.05); }
+.ana-cta:disabled { opacity: 0.7; cursor: default; }
+
+/* AI advice block */
+.ana-advice { border: 1px solid #e3e6ff; background: #f7f8ff; border-radius: 12px; padding: 16px; }
+.ana-advice-head { font-size: 13px; font-weight: 700; color: var(--ac-accent); }
+.ana-advice-body { font-size: 14px; line-height: 1.5; margin-top: 8px; white-space: pre-wrap; }
+.ana-advice-link { margin-top: 10px; border: 0; background: none; color: var(--ac-accent); font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; }
+
+/* Campaigns table */
+.ana-table { background: var(--ac-surface); border: 1px solid var(--ac-border); border-radius: 12px; overflow: hidden; }
+.ana-tr { display: grid; grid-template-columns: 2.2fr 0.8fr 1fr 1fr 0.7fr 1fr 0.9fr; align-items: center; gap: 8px; padding: 12px 16px; font-size: 13px; }
+.ana-th { background: #f8fafc; color: var(--ac-text-secondary); font-weight: 600; font-size: 12px; }
+.ana-row { width: 100%; border: 0; border-top: 1px solid var(--ac-border-soft); background: none; cursor: pointer; text-align: left; font: inherit; }
+.ana-row:hover { background: #f8fafc; }
+.ana-row span:not(.ana-row-name) { color: var(--ac-text-secondary); }
+.ana-row-name { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; color: var(--ac-text); }
+.ana-health { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.ana-health-good { background: #22c55e; }
+.ana-health-warning { background: #f59e0b; }
+.ana-health-critical { background: #ef4444; }
+
+/* Detail */
+.ana-detail { display: flex; flex-direction: column; gap: 16px; }
+.ana-detail-head { display: flex; align-items: center; gap: 16px; }
+.ana-back { border: 1px solid var(--ac-border); background: var(--ac-surface); border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; color: var(--ac-accent); }
+.ana-title { font-size: 18px; font-weight: 700; margin: 0; }
+.ana-subtitle { font-size: 13px; color: var(--ac-text-secondary); margin-top: 2px; }
+
+@media (max-width: 760px) {
+  .ana-platform-row { grid-template-columns: 110px 1fr; }
+  .ana-platform-val { grid-column: 2; text-align: left; }
+  .ana-tr { grid-template-columns: 2fr 1fr 1fr; }
+  .ana-tr span:nth-child(n+4) { display: none; }
+}

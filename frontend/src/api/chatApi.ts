@@ -4,6 +4,7 @@
  */
 
 import type { CampaignDraft } from "../types/campaign";
+import type { AnalyticsSummary, CampaignAdvice, CampaignAnalytics } from "../types/analytics";
 
 export interface ChatSession {
   id: string;
@@ -352,4 +353,18 @@ export async function listCampaigns(): Promise<CampaignSummary[]> {
   const data = await http<unknown>("/api/campaigns");
   const list = Array.isArray(data) ? data : isObject(data) && Array.isArray(data.campaigns) ? data.campaigns : [];
   return list.map(normalizeCampaign);
+}
+
+// ── Analytics ─────────────────────────────────────────────────────────────────
+
+export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
+  return http<AnalyticsSummary>("/api/analytics");
+}
+
+export async function getCampaignAnalytics(campaignId: number): Promise<CampaignAnalytics> {
+  return http<CampaignAnalytics>(`/api/analytics/${campaignId}`);
+}
+
+export async function getCampaignAdvice(campaignId: number): Promise<CampaignAdvice> {
+  return http<CampaignAdvice>(`/api/analytics/${campaignId}/advice`, { method: "POST" });
 }
