@@ -34,7 +34,7 @@ from agents.base import AgentContext
 from agents.supervisor import handle as supervisor_handle
 from db import ChatStore, init_db
 from schemas import CampaignDraft, ChatAction, ChatArtifact, ChatTraceEvent
-from tools import creative_gen, naming
+from tools import analytics, creative_gen, naming
 from tools.draft_ops import apply_patch
 from tools.forecast import apply_forecast
 
@@ -129,6 +129,41 @@ async def list_session_messages(session_id: str):
 async def list_campaigns():
     """Campaigns assembled by the agent — backs the Ad Campaigns list."""
     return await store.list_campaigns()
+
+
+# ── Analytics ─────────────────────────────────────────────────────────────────
+# One source of truth (tools/analytics) serves both this page and the Copilot
+# reporting agent, so figures and recommendations match everywhere.
+
+@app.get("/api/analytics")
+async def analytics_summary():
+    """Account-level summary across all campaigns (KPIs, series, per-campaign rows)."""
+    campaigns = await store.list_campaigns_full()
+    return analytics.account_summary(campaigns).model_dump(mode="json")
+
+
+@app.get("/api/analytics/{campaign_id}")
+async def analytics_campaign(campaign_id: int):
+    """Detailed performance + recommendations for one campaign."""
+    campaign = await store.get_campaign(campaign_id)
+    if campaign is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    return analytics.campaign_metrics(campaign).model_dump(mode="json")
+
+
+@app.post("/api/analytics/{campaign_id}/advice")
+async def analytics_advice(campaign_id: int):
+    """AI fix suggestions for a campaign — rule findings, phrased by the LLM."""
+    campaign = await store.get_campaign(campaign_id)
+    if campaign is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    metrics = analytics.campaign_metrics(campaign)
+    advice = await analytics.advice_text(metrics)
+    return {
+        "campaign_id": campaign_id,
+        "advice": advice,
+        "recommendations": [r.model_dump() for r in metrics.recommendations],
+    }
 
 
 # ── Interactive draft (clickable canvas) ──────────────────────────────────────

@@ -43,6 +43,94 @@ class ChatArtifact(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+# ── Analytics contract ────────────────────────────────────────────────────────
+# One source of truth for campaign performance: derived from the stored campaigns
+# and served identically to the analytics page and the Copilot reporting agent.
+
+class MetricPoint(BaseModel):
+    date: str
+    impressions: int
+    clicks: int
+    spend: float
+    results: int
+
+
+class PlatformMetric(BaseModel):
+    platform: str
+    label: str
+    impressions: int
+    clicks: int
+    spend: float
+    ctr: float
+
+
+class Recommendation(BaseModel):
+    severity: Literal["good", "warning", "critical"]
+    title: str
+    detail: str
+    action: str | None = None          # maps to a UI fix (refresh_creative / expand_audience / scale_budget …)
+    action_label: str | None = None
+
+
+class CampaignAnalytics(BaseModel):
+    campaign_id: int
+    name: str
+    channel: str | None = None
+    status: str = "active"
+    objective: str | None = None
+    result_label: str = "Результаты"
+    spend: float = 0.0
+    impressions: int = 0
+    reach: int = 0
+    frequency: float = 0.0
+    clicks: int = 0
+    ctr: float = 0.0                    # %
+    cpc: float = 0.0
+    cpm: float = 0.0
+    results: int = 0
+    cost_per_result: float = 0.0
+    conversions: int = 0
+    conversion_rate: float = 0.0        # %
+    roas: float | None = None
+    series: list[MetricPoint] = Field(default_factory=list)
+    platforms: list[PlatformMetric] = Field(default_factory=list)
+    recommendations: list[Recommendation] = Field(default_factory=list)
+
+
+class CampaignRow(BaseModel):
+    campaign_id: int
+    name: str
+    channel: str | None = None
+    status: str = "active"
+    objective: str | None = None
+    result_label: str = "Результаты"
+    spend: float = 0.0
+    impressions: int = 0
+    clicks: int = 0
+    ctr: float = 0.0
+    results: int = 0
+    cost_per_result: float = 0.0
+    health: Literal["good", "warning", "critical"] = "good"
+
+
+class AnalyticsSummary(BaseModel):
+    spend: float = 0.0
+    impressions: int = 0
+    reach: int = 0
+    clicks: int = 0
+    ctr: float = 0.0
+    cpc: float = 0.0
+    cpm: float = 0.0
+    results: int = 0
+    cost_per_result: float = 0.0
+    conversions: int = 0
+    campaign_count: int = 0
+    series: list[MetricPoint] = Field(default_factory=list)
+    platforms: list[PlatformMetric] = Field(default_factory=list)
+    campaigns: list[CampaignRow] = Field(default_factory=list)
+    recommendations: list[Recommendation] = Field(default_factory=list)
+
+
 # ── Campaign wizard domain model ──────────────────────────────────────────────
 
 # Wizard steps in product order. `ready` is a terminal pseudo-step meaning every

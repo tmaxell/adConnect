@@ -359,6 +359,22 @@ class ChatStore:
             )
             return [self._campaign_dict(c) for c in result]
 
+    async def list_campaigns_full(self) -> list[dict[str, Any]]:
+        """Campaigns including the full draft snapshot (for analytics)."""
+        async with session_scope() as db:
+            result = await db.scalars(
+                select(CampaignModel).order_by(CampaignModel.created_at.desc())
+            )
+            return [{**self._campaign_dict(c), "draft": c.draft_json or {}} for c in result]
+
+    async def get_campaign(self, campaign_id: int) -> dict[str, Any] | None:
+        """Single campaign with its full draft snapshot, or None."""
+        async with session_scope() as db:
+            c = await db.get(CampaignModel, campaign_id)
+            if c is None:
+                return None
+            return {**self._campaign_dict(c), "draft": c.draft_json or {}}
+
     # ── Serializers ───────────────────────────────────────────────────────────
 
     @staticmethod
