@@ -17,6 +17,14 @@ export interface PlatformMetric {
   ctr: number;
 }
 
+export interface DemographicMetric {
+  dimension: "age" | "gender" | string;
+  label: string;
+  impressions: number;
+  results: number;
+  share: number;
+}
+
 export type Severity = "good" | "warning" | "critical";
 
 export interface Recommendation {
@@ -47,8 +55,10 @@ export interface CampaignAnalytics {
   conversions: number;
   conversion_rate: number;
   roas: number | null;
+  deltas: Record<string, number>;
   series: MetricPoint[];
   platforms: PlatformMetric[];
+  demographics: DemographicMetric[];
   recommendations: Recommendation[];
 }
 
@@ -91,9 +101,11 @@ export interface AnalyticsSummary {
   cost_per_result: number;
   conversions: number;
   campaign_count: number;
+  deltas: Record<string, number>;
   series: MetricPoint[];
   platforms: PlatformMetric[];
   channels: ChannelMetric[];
+  demographics: DemographicMetric[];
   campaigns: CampaignRow[];
   recommendations: Recommendation[];
 }

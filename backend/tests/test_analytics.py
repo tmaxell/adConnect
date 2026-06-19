@@ -81,6 +81,23 @@ def test_empty_account_summary():
     assert s.campaign_count == 0 and s.campaigns == []
 
 
+def test_deltas_and_demographics():
+    m = campaign_metrics(_camp(cid=11))
+    assert set(m.deltas) >= {"spend", "impressions", "clicks", "ctr", "results", "cost_per_result"}
+    ages = [d for d in m.demographics if d.dimension == "age"]
+    genders = [d for d in m.demographics if d.dimension == "gender"]
+    assert len(ages) == 5 and len(genders) == 2
+    assert abs(sum(a.share for a in ages) - 100) < 1.5
+    assert abs(sum(g.share for g in genders) - 100) < 1.5
+
+
+def test_summary_aggregates_deltas_and_demographics():
+    s = account_summary([_camp(cid=1), _camp(cid=2), _camp(cid=3, channel="sms")])
+    assert set(s.deltas) >= {"spend", "clicks", "results"}
+    ages = [d for d in s.demographics if d.dimension == "age"]
+    assert len(ages) == 5 and abs(sum(a.share for a in ages) - 100) < 1.5
+
+
 def test_channel_distribution():
     s = account_summary([
         _camp(cid=1, channel="meta"), _camp(cid=2, channel="meta"),

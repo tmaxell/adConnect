@@ -64,6 +64,14 @@ class PlatformMetric(BaseModel):
     ctr: float
 
 
+class DemographicMetric(BaseModel):
+    dimension: str                      # "age" | "gender"
+    label: str                          # "25-34" | "Мужчины"
+    impressions: int = 0
+    results: int = 0
+    share: float = 0.0                  # % of impressions within its dimension
+
+
 class Recommendation(BaseModel):
     severity: Literal["good", "warning", "critical"]
     title: str
@@ -92,8 +100,10 @@ class CampaignAnalytics(BaseModel):
     conversions: int = 0
     conversion_rate: float = 0.0        # %
     roas: float | None = None
+    deltas: dict[str, float] = Field(default_factory=dict)   # % change vs previous period
     series: list[MetricPoint] = Field(default_factory=list)
     platforms: list[PlatformMetric] = Field(default_factory=list)
+    demographics: list[DemographicMetric] = Field(default_factory=list)
     recommendations: list[Recommendation] = Field(default_factory=list)
 
 
@@ -136,9 +146,11 @@ class AnalyticsSummary(BaseModel):
     cost_per_result: float = 0.0
     conversions: int = 0
     campaign_count: int = 0
+    deltas: dict[str, float] = Field(default_factory=dict)   # % change vs previous period
     series: list[MetricPoint] = Field(default_factory=list)
     platforms: list[PlatformMetric] = Field(default_factory=list)
     channels: list[ChannelMetric] = Field(default_factory=list)
+    demographics: list[DemographicMetric] = Field(default_factory=list)
     campaigns: list[CampaignRow] = Field(default_factory=list)
     recommendations: list[Recommendation] = Field(default_factory=list)
 

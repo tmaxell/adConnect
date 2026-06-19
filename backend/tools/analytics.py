@@ -25,10 +25,16 @@ from schemas import (
     CampaignAnalytics,
     CampaignRow,
     ChannelMetric,
+    DemographicMetric,
     MetricPoint,
     PlatformMetric,
     Recommendation,
 )
+
+_AGE_BANDS = ("18-24", "25-34", "35-44", "45-54", "55+")
+# Typical weighting — 25-44 carries most volume.
+_AGE_WEIGHTS = (0.18, 0.32, 0.26, 0.14, 0.10)
+_DELTA_KEYS = ("spend", "impressions", "clicks", "ctr", "results", "cost_per_result")
 from tools.forecast import _PLATFORM_LABEL, _PLATFORM_WEIGHT
 
 _CHANNEL_LABEL = {"sms": "SMS", "email": "Email", "meta": "Meta"}
@@ -119,6 +125,8 @@ def campaign_metrics(campaign: dict) -> CampaignAnalytics:
 
     series = _build_series(campaign, rng, impressions, clicks, spend, results, ctr)
     platforms = _build_platforms(meta, is_network, impressions, clicks, spend, ctr, rng)
+    demographics = _build_demographics(rng, impressions, results)
+    deltas = _build_deltas(rng)
     metrics = CampaignAnalytics(
         campaign_id=int(campaign.get("id") or 0),
         name=str(campaign.get("name") or "Кампания"),
@@ -130,7 +138,7 @@ def campaign_metrics(campaign: dict) -> CampaignAnalytics:
         clicks=clicks, ctr=ctr, cpc=cpc, cpm=cpm,
         results=results, cost_per_result=cost_per_result,
         conversions=conversions, conversion_rate=conversion_rate, roas=roas,
-        series=series, platforms=platforms,
+        deltas=deltas, series=series, platforms=platforms, demographics=demographics,
     )
     metrics.recommendations = recommendations(metrics)
     return metrics
@@ -149,6 +157,35 @@ def _build_series(campaign, rng, impressions, clicks, spend, results, ctr) -> li
                     impressions=imp[i], clicks=clk[i], spend=float(spd[i]), results=res[i])
         for i in range(_SERIES_DAYS)
     ]
+
+
+def _build_deltas(rng: random.Random) -> dict[str, float]:
+    """% change vs the previous 14-day period (deterministic mock)."""
+    out: dict[str, float] = {}
+    for k in _DELTA_KEYS:
+        out[k] = round(rng.uniform(-22, 34), 1)
+    # Cost per result usually moves opposite to results.
+    out["cost_per_result"] = round(rng.uniform(-18, 22), 1)
+    return out
+
+
+def _build_demographics(rng: random.Random, impressions: int, results: int) -> list[DemographicMetric]:
+    rows: list[DemographicMetric] = []
+    # Age bands — jitter the base weights, then normalise.
+    aw = [w * rng.uniform(0.8, 1.2) for w in _AGE_WEIGHTS]
+    s = sum(aw) or 1.0
+    for band, w in zip(_AGE_BANDS, aw):
+        share = w / s
+        rows.append(DemographicMetric(dimension="age", label=band,
+                                      impressions=int(impressions * share),
+                                      results=int(results * share), share=round(share * 100, 1)))
+    # Gender split.
+    men = rng.uniform(0.4, 0.6)
+    for label, share in (("Мужчины", men), ("Женщины", 1 - men)):
+        rows.append(DemographicMetric(dimension="gender", label=label,
+                                      impressions=int(impressions * share),
+                                      results=int(results * share), share=round(share * 100, 1)))
+    return rows
 
 
 def _build_platforms(meta, is_network, impressions, clicks, spend, ctr, rng) -> list[PlatformMetric]:
@@ -367,6 +404,33 @@ def account_summary(campaigns: list[dict]) -> AnalyticsSummary:
     for row in by_channel.values():
         row.share = round(row.spend / summary.spend * 100, 1) if summary.spend else 0.0
     summary.channels = sorted(by_channel.values(), key=lambda x: -x.spend)
+
+    # Period-over-period deltas: spend-weighted average of per-campaign deltas.
+    wsum = summary.spend or 1.0
+    for k in _DELTA_KEYS:
+        summary.deltas[k] = round(sum(m.deltas.get(k, 0.0) * m.spend for m in metrics) / wsum, 1)
+
+    # Demographics aggregated across campaigns (recompute share within dimension).
+    by_demo: dict[tuple[str, str], DemographicMetric] = {}
+    for m in metrics:
+        for d in m.demographics:
+            agg = by_demo.get((d.dimension, d.label))
+            if agg is None:
+                by_demo[(d.dimension, d.label)] = DemographicMetric(
+                    dimension=d.dimension, label=d.label, impressions=d.impressions, results=d.results)
+            else:
+                agg.impressions += d.impressions
+                agg.results += d.results
+    for dim in ("age", "gender"):
+        rows = [d for (dd, _), d in by_demo.items() if dd == dim]
+        tot = sum(d.impressions for d in rows) or 1
+        for d in rows:
+            d.share = round(d.impressions / tot * 100, 1)
+    order = {b: i for i, b in enumerate(_AGE_BANDS)}
+    summary.demographics = sorted(
+        by_demo.values(),
+        key=lambda d: (d.dimension != "age", order.get(d.label, 99), -d.impressions),
+    )
 
     summary.campaigns = [
         CampaignRow(

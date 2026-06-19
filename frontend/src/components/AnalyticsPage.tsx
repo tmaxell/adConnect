@@ -17,6 +17,8 @@ import type {
   AnalyticsSummary,
   CampaignAnalytics,
   ChannelMetric,
+  CampaignRow,
+  DemographicMetric,
   MetricPoint,
   PlatformMetric,
   Recommendation,
@@ -39,12 +41,29 @@ const CHANNEL_COLOR: Record<string, string> = {
 const num = (n: number) => n.toLocaleString("ru-RU").replace(/,/g, " ");
 const money = (n: number) => `${num(Math.round(n))} ₽`;
 
-function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+/** Delta chip vs previous period; colour respects whether up is good. */
+function DeltaChip({ delta, betterWhenUp = true }: { delta?: number; betterWhenUp?: boolean }) {
+  if (delta == null || !isFinite(delta)) return null;
+  const up = delta >= 0;
+  const good = up === betterWhenUp;
+  return (
+    <span className={`ana-delta ana-delta-${good ? "up" : "down"}`}>
+      {up ? "▲" : "▼"} {Math.abs(delta)}%
+    </span>
+  );
+}
+
+function KpiCard({ label, value, sub, delta, betterWhenUp }: {
+  label: string; value: string; sub?: string; delta?: number; betterWhenUp?: boolean;
+}) {
   return (
     <div className="ana-kpi">
       <div className="ana-kpi-label">{label}</div>
       <div className="ana-kpi-value">{value}</div>
-      {sub && <div className="ana-kpi-sub">{sub}</div>}
+      <div className="ana-kpi-foot">
+        {sub && <span className="ana-kpi-sub">{sub}</span>}
+        <DeltaChip delta={delta} betterWhenUp={betterWhenUp} />
+      </div>
     </div>
   );
 }
@@ -65,56 +84,147 @@ function niceMax(v: number): number {
   return 10 * pow;
 }
 
+type TrendMetric = "impressions" | "clicks" | "spend" | "results" | "ctr";
+const TREND_METRICS: Array<{ id: TrendMetric; label: string; color: string; line?: boolean; pct?: boolean; money?: boolean }> = [
+  { id: "impressions", label: "Показы", color: "#6366f1" },
+  { id: "clicks", label: "Клики", color: "#22c55e" },
+  { id: "spend", label: "Расход", color: "#0ea5e9", money: true },
+  { id: "results", label: "Результаты", color: "#a855f7" },
+  { id: "ctr", label: "CTR", color: "#f59e0b", line: true, pct: true },
+];
+
 /**
- * Daily-trend chart: impressions as bars (left axis, with gridlines) and clicks as
- * a line on a separate right axis — so the two very different scales each read
- * clearly instead of overlapping as look-alike normalized curves.
+ * Daily-trend chart with a metric selector — each metric on its own properly
+ * scaled axis (bars for counts/spend, a line for CTR), with the period average
+ * and the change vs the previous period. Mirrors aggregator/Meta reporting.
  */
-function TrendChart({ series }: { series: MetricPoint[] }) {
+function TrendChart({ series, deltas }: { series: MetricPoint[]; deltas?: Record<string, number> }) {
+  const [metric, setMetric] = useState<TrendMetric>("impressions");
   if (series.length < 2) return <div className="ana-chart-empty">Недостаточно данных</div>;
-  const W = 720, H = 240, padL = 46, padR = 46, padT = 18, padB = 26;
+  const def = TREND_METRICS.find((m) => m.id === metric)!;
+  const valueOf = (p: MetricPoint) =>
+    metric === "ctr" ? (p.impressions ? (p.clicks / p.impressions) * 100 : 0) : (p[metric] as number);
+  const vals = series.map(valueOf);
+
+  const W = 720, H = 240, padL = 48, padR = 14, padT = 18, padB = 26;
   const innerW = W - padL - padR, innerH = H - padT - padB;
   const n = series.length;
-  const imprMax = niceMax(Math.max(...series.map((p) => p.impressions), 1));
-  const clickMax = niceMax(Math.max(...series.map((p) => p.clicks), 1));
+  const max = niceMax(Math.max(...vals, def.pct ? 1 : 1));
   const slot = innerW / n;
   const barW = slot * 0.55;
   const cx = (i: number) => padL + slot * i + slot / 2;
-  const yI = (v: number) => padT + innerH * (1 - v / imprMax);
-  const yC = (v: number) => padT + innerH * (1 - v / clickMax);
+  const y = (v: number) => padT + innerH * (1 - v / max);
   const grid = [0, 0.5, 1];
-  const clicksLine = series.map((p, i) => `${cx(i).toFixed(1)},${yC(p.clicks).toFixed(1)}`).join(" ");
+  const linePts = series.map((_, i) => `${cx(i).toFixed(1)},${y(vals[i]).toFixed(1)}`).join(" ");
   const ticks = [0, Math.floor((n - 1) / 2), n - 1];
-  const avg = (k: "impressions" | "clicks") => Math.round(series.reduce((s, p) => s + p[k], 0) / n);
+  const avg = vals.reduce((s, v) => s + v, 0) / n;
+  const avgLabel = def.pct ? `${avg.toFixed(2)}%` : def.money ? money(avg) : num(Math.round(avg));
+  const axisLabel = (v: number) => (def.pct ? `${v.toFixed(0)}%` : kfmt(v));
 
   return (
     <div className="ana-chart">
-      <div className="ana-chart-legend">
-        <span><i className="ana-barmark" /> Показы · {num(avg("impressions"))}/день в среднем</span>
-        <span><i className="ana-dot" style={{ background: "#22c55e" }} /> Клики · {num(avg("clicks"))}/день в среднем</span>
+      <div className="ana-chart-head">
+        <div className="ana-metric-tabs">
+          {TREND_METRICS.map((m) => (
+            <button key={m.id} type="button" className={`ana-metric-tab${metric === m.id ? " on" : ""}`}
+              onClick={() => setMetric(m.id)}>{m.label}</button>
+          ))}
+        </div>
+        <div className="ana-chart-avg">
+          {def.label}: <b>{avgLabel}</b>/день <DeltaChip delta={deltas?.[metric]} betterWhenUp />
+        </div>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="ana-chart-svg" role="img">
         {grid.map((g) => {
-          const y = padT + innerH * (1 - g);
+          const gy = padT + innerH * (1 - g);
           return (
             <g key={g}>
-              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="#eef2f7" strokeWidth="1" />
-              <text x={padL - 8} y={y + 4} textAnchor="end" className="ana-axis ana-axis-l">{kfmt(imprMax * g)}</text>
-              <text x={W - padR + 8} y={y + 4} textAnchor="start" className="ana-axis ana-axis-r">{kfmt(clickMax * g)}</text>
+              <line x1={padL} y1={gy} x2={W - padR} y2={gy} stroke="#eef2f7" strokeWidth="1" />
+              <text x={padL - 8} y={gy + 4} textAnchor="end" className="ana-axis">{axisLabel(max * g)}</text>
             </g>
           );
         })}
-        {series.map((p, i) => (
-          <rect key={i} x={cx(i) - barW / 2} y={yI(p.impressions)} width={barW}
-            height={Math.max(0, padT + innerH - yI(p.impressions))} rx="2" fill="#c7cdfb" />
-        ))}
-        <polyline points={clicksLine} fill="none" stroke="#22c55e" strokeWidth="2.5"
-          strokeLinejoin="round" strokeLinecap="round" />
-        {series.map((p, i) => <circle key={i} cx={cx(i)} cy={yC(p.clicks)} r="2.6" fill="#22c55e" />)}
+        {def.line ? (
+          <>
+            <polyline points={linePts} fill="none" stroke={def.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+            {series.map((_, i) => <circle key={i} cx={cx(i)} cy={y(vals[i])} r="2.6" fill={def.color} />)}
+          </>
+        ) : (
+          series.map((_, i) => (
+            <rect key={i} x={cx(i) - barW / 2} y={y(vals[i])} width={barW}
+              height={Math.max(0, padT + innerH - y(vals[i]))} rx="2" fill={def.color} opacity="0.85" />
+          ))
+        )}
         {ticks.map((t) => (
           <text key={t} x={cx(t)} y={H - 8} textAnchor="middle" className="ana-axis">{series[t].date.slice(5)}</text>
         ))}
       </svg>
+    </div>
+  );
+}
+
+/** Funnel: Показы → Клики → Результаты with step conversion rates. */
+function Funnel({ impressions, clicks, results, resultLabel }: {
+  impressions: number; clicks: number; results: number; resultLabel: string;
+}) {
+  if (!impressions) return null;
+  const stages = [
+    { label: "Показы", value: impressions, color: "#6366f1" },
+    { label: "Клики", value: clicks, color: "#22c55e" },
+    { label: resultLabel, value: results, color: "#a855f7" },
+  ];
+  const ctr = impressions ? (clicks / impressions) * 100 : 0;
+  const cr = clicks ? (results / clicks) * 100 : 0;
+  return (
+    <div className="ana-funnel">
+      {stages.map((s, i) => (
+        <div key={s.label} className="ana-funnel-stage">
+          <div className="ana-funnel-bar-row">
+            <div className="ana-funnel-bar" style={{ width: `${(s.value / impressions) * 100}%`, background: s.color }} />
+            <span className="ana-funnel-val">{num(s.value)}</span>
+          </div>
+          <div className="ana-funnel-label">{s.label}</div>
+          {i < stages.length - 1 && (
+            <div className="ana-funnel-step">↓ {(i === 0 ? ctr : cr).toFixed(2)}% {i === 0 ? "CTR" : "конверсия в результат"}</div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Age + gender breakdown bars (Meta-style demographics). */
+function Demographics({ demographics }: { demographics: DemographicMetric[] }) {
+  const ages = demographics.filter((d) => d.dimension === "age");
+  const genders = demographics.filter((d) => d.dimension === "gender");
+  if (!ages.length && !genders.length) return null;
+  const ageMax = Math.max(...ages.map((a) => a.share), 1);
+  return (
+    <div className="ana-demo">
+      {ages.length > 0 && (
+        <div className="ana-demo-block">
+          <div className="ana-demo-title">Возраст</div>
+          {ages.map((a) => (
+            <div key={a.label} className="ana-demo-row">
+              <span className="ana-demo-key">{a.label}</span>
+              <div className="ana-bar-track"><div className="ana-bar" style={{ width: `${(a.share / ageMax) * 100}%`, background: "#6366f1" }} /></div>
+              <span className="ana-demo-val">{a.share}%</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {genders.length > 0 && (
+        <div className="ana-demo-block">
+          <div className="ana-demo-title">Пол</div>
+          <div className="ana-gender">
+            {genders.map((g) => (
+              <div key={g.label} className="ana-gender-seg" style={{ width: `${g.share}%`, background: g.label === "Мужчины" ? "#0ea5e9" : "#ec4899" }}>
+                <span className="ana-gender-lbl">{g.label} · {g.share}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -233,22 +343,34 @@ function CampaignDetail({ campaignId, onBack }: { campaignId: number; onBack: ()
       </div>
 
       <div className="ana-kpis">
-        <KpiCard label="Расход" value={money(data.spend)} />
-        <KpiCard label="Показы" value={num(data.impressions)} sub={`Охват ${num(data.reach)}`} />
+        <KpiCard label="Расход" value={money(data.spend)} delta={data.deltas?.spend} />
+        <KpiCard label="Показы" value={num(data.impressions)} sub={`Охват ${num(data.reach)}`} delta={data.deltas?.impressions} />
         <KpiCard label="Частота" value={`${data.frequency}`} sub="показов на человека" />
-        <KpiCard label="Клики" value={num(data.clicks)} sub={`CTR ${data.ctr}%`} />
+        <KpiCard label="Клики" value={num(data.clicks)} sub={`CTR ${data.ctr}%`} delta={data.deltas?.clicks} />
         <KpiCard label="CPC / CPM" value={`${data.cpc} / ${data.cpm} ₽`} />
-        <KpiCard label={data.result_label} value={num(data.results)} sub={`${data.cost_per_result} ₽ за результат`} />
+        <KpiCard label={data.result_label} value={num(data.results)} sub={`${data.cost_per_result} ₽ за результат`} delta={data.deltas?.results} />
         {data.roas != null && <KpiCard label="ROAS" value={`${data.roas}×`} />}
       </div>
 
+      <div className="ana-section-title">Воронка</div>
+      <div className="ana-card-box">
+        <Funnel impressions={data.impressions} clicks={data.clicks} results={data.results} resultLabel={data.result_label} />
+      </div>
+
       <div className="ana-section-title">Динамика за 14 дней</div>
-      <TrendChart series={data.series} />
+      <TrendChart series={data.series} deltas={data.deltas} />
 
       {data.platforms.length > 0 && (
         <>
           <div className="ana-section-title">Площадки</div>
           <PlatformBars platforms={data.platforms} />
+        </>
+      )}
+
+      {data.demographics.length > 0 && (
+        <>
+          <div className="ana-section-title">Демография</div>
+          <div className="ana-card-box"><Demographics demographics={data.demographics} /></div>
         </>
       )}
 
@@ -287,14 +409,19 @@ function Summary({ summary, onSelect }: { summary: AnalyticsSummary; onSelect: (
   return (
     <>
       <div className="ana-kpis">
-        <KpiCard label="Расход" value={money(summary.spend)} sub={`${summary.campaign_count} кампаний`} />
-        <KpiCard label="Показы" value={num(summary.impressions)} sub={`Охват ${num(summary.reach)}`} />
-        <KpiCard label="Клики" value={num(summary.clicks)} sub={`CTR ${summary.ctr}%`} />
+        <KpiCard label="Расход" value={money(summary.spend)} sub={`${summary.campaign_count} кампаний`} delta={summary.deltas?.spend} />
+        <KpiCard label="Показы" value={num(summary.impressions)} sub={`Охват ${num(summary.reach)}`} delta={summary.deltas?.impressions} />
+        <KpiCard label="Клики" value={num(summary.clicks)} sub={`CTR ${summary.ctr}%`} delta={summary.deltas?.clicks} />
         <KpiCard label="CPC / CPM" value={`${summary.cpc} / ${summary.cpm} ₽`} />
-        <KpiCard label="Результаты" value={num(summary.results)} sub={`${summary.cost_per_result} ₽ за результат`} />
+        <KpiCard label="Результаты" value={num(summary.results)} sub={`${summary.cost_per_result} ₽ за результат`} delta={summary.deltas?.results} />
       </div>
 
       {summary.recommendations.map((r, i) => <RecoCard key={i} rec={r} />)}
+
+      <div className="ana-section-title">Воронка (все кампании)</div>
+      <div className="ana-card-box">
+        <Funnel impressions={summary.impressions} clicks={summary.clicks} results={summary.results} resultLabel="Результаты" />
+      </div>
 
       {summary.channels.length > 0 && (
         <>
@@ -304,7 +431,7 @@ function Summary({ summary, onSelect }: { summary: AnalyticsSummary; onSelect: (
       )}
 
       <div className="ana-section-title">Динамика за 14 дней (все кампании)</div>
-      <TrendChart series={summary.series} />
+      <TrendChart series={summary.series} deltas={summary.deltas} />
 
       {summary.platforms.length > 0 && (
         <>
@@ -313,25 +440,54 @@ function Summary({ summary, onSelect }: { summary: AnalyticsSummary; onSelect: (
         </>
       )}
 
+      {summary.demographics.length > 0 && (
+        <>
+          <div className="ana-section-title">Демография</div>
+          <div className="ana-card-box"><Demographics demographics={summary.demographics} /></div>
+        </>
+      )}
+
       <div className="ana-section-title">Кампании</div>
-      <div className="ana-table">
-        <div className="ana-tr ana-th">
-          <span>Кампания</span><span>Канал</span><span>Расход</span>
-          <span>Показы</span><span>CTR</span><span>Результаты</span><span>Цена</span>
-        </div>
-        {summary.campaigns.map((c) => (
-          <button key={c.campaign_id} type="button" className="ana-tr ana-row" onClick={() => onSelect(c.campaign_id)}>
-            <span className="ana-row-name"><i className={`ana-health ana-health-${c.health}`} />{c.name}</span>
-            <span>{c.channel ? CHANNEL_LABEL[c.channel] ?? c.channel : "—"}</span>
-            <span>{money(c.spend)}</span>
-            <span>{num(c.impressions)}</span>
-            <span>{c.ctr}%</span>
-            <span>{num(c.results)}</span>
-            <span>{c.cost_per_result} ₽</span>
-          </button>
+      <CampaignsTable rows={summary.campaigns} onSelect={onSelect} />
+    </>
+  );
+}
+
+type SortKey = "name" | "channel" | "spend" | "impressions" | "ctr" | "results" | "cost_per_result";
+
+function CampaignsTable({ rows, onSelect }: { rows: CampaignRow[]; onSelect: (id: number) => void }) {
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "spend", dir: -1 });
+  const sorted = [...rows].sort((a, b) => {
+    const va = a[sort.key], vb = b[sort.key];
+    if (typeof va === "number" && typeof vb === "number") return (va - vb) * sort.dir;
+    return String(va ?? "").localeCompare(String(vb ?? "")) * sort.dir;
+  });
+  const toggle = (key: SortKey) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: -1 }));
+  const arrow = (key: SortKey) => (sort.key === key ? (sort.dir === 1 ? " ▲" : " ▼") : "");
+  const cols: Array<[SortKey, string]> = [
+    ["name", "Кампания"], ["channel", "Канал"], ["spend", "Расход"],
+    ["impressions", "Показы"], ["ctr", "CTR"], ["results", "Результаты"], ["cost_per_result", "Цена"],
+  ];
+  return (
+    <div className="ana-table">
+      <div className="ana-tr ana-th">
+        {cols.map(([key, label]) => (
+          <button key={key} type="button" className="ana-th-cell" onClick={() => toggle(key)}>{label}{arrow(key)}</button>
         ))}
       </div>
-    </>
+      {sorted.map((c) => (
+        <button key={c.campaign_id} type="button" className="ana-tr ana-row" onClick={() => onSelect(c.campaign_id)}>
+          <span className="ana-row-name"><i className={`ana-health ana-health-${c.health}`} />{c.name}</span>
+          <span>{c.channel ? CHANNEL_LABEL[c.channel] ?? c.channel : "—"}</span>
+          <span>{money(c.spend)}</span>
+          <span>{num(c.impressions)}</span>
+          <span>{c.ctr}%</span>
+          <span>{num(c.results)}</span>
+          <span>{c.cost_per_result} ₽</span>
+        </button>
+      ))}
+    </div>
   );
 }
 

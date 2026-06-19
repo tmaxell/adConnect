@@ -708,3 +708,44 @@ button.ac-side-item {
 
 /* Copilot-recommended marker (media generation) */
 .acw-copilot-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ac-accent); background: var(--ac-accent-soft); border-radius: 6px; padding: 4px 10px; margin-bottom: 10px; }
+
+/* KPI delta chips */
+.ana-kpi-foot { display: flex; align-items: center; gap: 8px; margin-top: 2px; flex-wrap: wrap; }
+.ana-delta { font-size: 12px; font-weight: 700; border-radius: 6px; padding: 1px 6px; }
+.ana-delta-up { color: #16a34a; background: #f0fdf4; }
+.ana-delta-down { color: #dc2626; background: #fef2f2; }
+
+/* Trend chart metric selector */
+.ana-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.ana-metric-tabs { display: inline-flex; background: #eef1f6; border-radius: 9px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+.ana-metric-tab { border: 0; background: none; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: var(--ac-text-secondary); padding: 6px 12px; border-radius: 7px; }
+.ana-metric-tab.on { background: var(--ac-surface); color: var(--ac-accent); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+.ana-chart-avg { font-size: 13px; color: var(--ac-text-secondary); }
+.ana-chart-avg b { color: var(--ac-text); }
+
+/* Funnel */
+.ana-funnel { display: flex; flex-direction: column; gap: 6px; }
+.ana-funnel-stage { display: flex; flex-direction: column; gap: 4px; }
+.ana-funnel-bar-row { display: flex; align-items: center; gap: 10px; }
+.ana-funnel-bar { height: 30px; border-radius: 6px; min-width: 6px; transition: width .2s; }
+.ana-funnel-val { font-size: 14px; font-weight: 700; }
+.ana-funnel-label { font-size: 12px; color: var(--ac-text-secondary); }
+.ana-funnel-step { font-size: 12px; color: var(--ac-text-muted); padding: 2px 0 6px; }
+
+/* Demographics */
+.ana-demo { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; }
+.ana-demo-title { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+.ana-demo-row { display: grid; grid-template-columns: 52px 1fr 44px; align-items: center; gap: 10px; font-size: 13px; margin-bottom: 8px; }
+.ana-demo-key { color: var(--ac-text-secondary); }
+.ana-demo-val { text-align: right; color: var(--ac-text-secondary); }
+.ana-gender { display: flex; height: 40px; border-radius: 8px; overflow: hidden; }
+.ana-gender-seg { display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 600; min-width: 0; transition: width .2s; }
+.ana-gender-lbl { white-space: nowrap; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Sortable table header */
+.ana-th-cell { border: 0; background: none; cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; color: var(--ac-text-secondary); text-align: left; padding: 0; }
+.ana-th-cell:hover { color: var(--ac-accent); }
+
+@media (max-width: 760px) {
+  .ana-demo { grid-template-columns: 1fr; gap: 16px; }
+}
