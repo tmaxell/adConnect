@@ -49,32 +49,72 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
   );
 }
 
-/** Dual-line chart (impressions + clicks) over the daily series; each line scaled to its own max. */
-function LineChart({ series }: { series: MetricPoint[] }) {
-  const W = 720, H = 220, padX = 8, padY = 16;
+/** Compact number for axis labels: 10184 → "10к", 4980 → "5,0к". */
+function kfmt(v: number): string {
+  if (v >= 1000) {
+    const n = v / 1000;
+    return (n >= 10 ? String(Math.round(n)) : n.toFixed(1).replace(".", ",")) + "к";
+  }
+  return String(Math.round(v));
+}
+/** Round a max up to a "nice" axis bound (1/2/2.5/5/10 × 10ⁿ). */
+function niceMax(v: number): number {
+  if (v <= 0) return 1;
+  const pow = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const m of [1, 2, 2.5, 5, 10]) if (m * pow >= v) return m * pow;
+  return 10 * pow;
+}
+
+/**
+ * Daily-trend chart: impressions as bars (left axis, with gridlines) and clicks as
+ * a line on a separate right axis — so the two very different scales each read
+ * clearly instead of overlapping as look-alike normalized curves.
+ */
+function TrendChart({ series }: { series: MetricPoint[] }) {
   if (series.length < 2) return <div className="ana-chart-empty">Недостаточно данных</div>;
-  const xs = (i: number) => padX + (i / (series.length - 1)) * (W - padX * 2);
-  const line = (key: "impressions" | "clicks") => {
-    const max = Math.max(...series.map((p) => p[key]), 1);
-    return series
-      .map((p, i) => `${xs(i).toFixed(1)},${(H - padY - (p[key] / max) * (H - padY * 2)).toFixed(1)}`)
-      .join(" ");
-  };
-  const last = series[series.length - 1];
-  const ticks = [0, Math.floor((series.length - 1) / 2), series.length - 1];
+  const W = 720, H = 240, padL = 46, padR = 46, padT = 18, padB = 26;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const n = series.length;
+  const imprMax = niceMax(Math.max(...series.map((p) => p.impressions), 1));
+  const clickMax = niceMax(Math.max(...series.map((p) => p.clicks), 1));
+  const slot = innerW / n;
+  const barW = slot * 0.55;
+  const cx = (i: number) => padL + slot * i + slot / 2;
+  const yI = (v: number) => padT + innerH * (1 - v / imprMax);
+  const yC = (v: number) => padT + innerH * (1 - v / clickMax);
+  const grid = [0, 0.5, 1];
+  const clicksLine = series.map((p, i) => `${cx(i).toFixed(1)},${yC(p.clicks).toFixed(1)}`).join(" ");
+  const ticks = [0, Math.floor((n - 1) / 2), n - 1];
+  const avg = (k: "impressions" | "clicks") => Math.round(series.reduce((s, p) => s + p[k], 0) / n);
+
   return (
     <div className="ana-chart">
       <div className="ana-chart-legend">
-        <span><i className="ana-dot" style={{ background: "#6366f1" }} /> Показы · {num(last.impressions)}/день</span>
-        <span><i className="ana-dot" style={{ background: "#22c55e" }} /> Клики · {num(last.clicks)}/день</span>
+        <span><i className="ana-barmark" /> Показы · {num(avg("impressions"))}/день в среднем</span>
+        <span><i className="ana-dot" style={{ background: "#22c55e" }} /> Клики · {num(avg("clicks"))}/день в среднем</span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="ana-chart-svg" preserveAspectRatio="none">
-        <polyline points={line("impressions")} fill="none" stroke="#6366f1" strokeWidth="2.5" />
-        <polyline points={line("clicks")} fill="none" stroke="#22c55e" strokeWidth="2.5" />
+      <svg viewBox={`0 0 ${W} ${H}`} className="ana-chart-svg" role="img">
+        {grid.map((g) => {
+          const y = padT + innerH * (1 - g);
+          return (
+            <g key={g}>
+              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="#eef2f7" strokeWidth="1" />
+              <text x={padL - 8} y={y + 4} textAnchor="end" className="ana-axis ana-axis-l">{kfmt(imprMax * g)}</text>
+              <text x={W - padR + 8} y={y + 4} textAnchor="start" className="ana-axis ana-axis-r">{kfmt(clickMax * g)}</text>
+            </g>
+          );
+        })}
+        {series.map((p, i) => (
+          <rect key={i} x={cx(i) - barW / 2} y={yI(p.impressions)} width={barW}
+            height={Math.max(0, padT + innerH - yI(p.impressions))} rx="2" fill="#c7cdfb" />
+        ))}
+        <polyline points={clicksLine} fill="none" stroke="#22c55e" strokeWidth="2.5"
+          strokeLinejoin="round" strokeLinecap="round" />
+        {series.map((p, i) => <circle key={i} cx={cx(i)} cy={yC(p.clicks)} r="2.6" fill="#22c55e" />)}
+        {ticks.map((t) => (
+          <text key={t} x={cx(t)} y={H - 8} textAnchor="middle" className="ana-axis">{series[t].date.slice(5)}</text>
+        ))}
       </svg>
-      <div className="ana-chart-x">
-        {ticks.map((t) => <span key={t}>{series[t].date.slice(5)}</span>)}
-      </div>
     </div>
   );
 }
@@ -203,7 +243,7 @@ function CampaignDetail({ campaignId, onBack }: { campaignId: number; onBack: ()
       </div>
 
       <div className="ana-section-title">Динамика за 14 дней</div>
-      <LineChart series={data.series} />
+      <TrendChart series={data.series} />
 
       {data.platforms.length > 0 && (
         <>
@@ -264,7 +304,7 @@ function Summary({ summary, onSelect }: { summary: AnalyticsSummary; onSelect: (
       )}
 
       <div className="ana-section-title">Динамика за 14 дней (все кампании)</div>
-      <LineChart series={summary.series} />
+      <TrendChart series={summary.series} />
 
       {summary.platforms.length > 0 && (
         <>

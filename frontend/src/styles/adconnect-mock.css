@@ -614,8 +614,11 @@ button.ac-side-item {
 .ana-chart { background: var(--ac-surface); border: 1px solid var(--ac-border); border-radius: 12px; padding: 16px; }
 .ana-chart-legend { display: flex; gap: 20px; font-size: 13px; color: var(--ac-text-secondary); margin-bottom: 8px; }
 .ana-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
-.ana-chart-svg { width: 100%; height: 200px; display: block; }
-.ana-chart-x { display: flex; justify-content: space-between; font-size: 11px; color: var(--ac-text-muted); margin-top: 4px; }
+.ana-barmark { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: #c7cdfb; margin-right: 6px; vertical-align: middle; }
+.ana-chart-svg { width: 100%; height: auto; display: block; }
+.ana-axis { font-size: 11px; fill: var(--ac-text-muted); }
+.ana-axis-l { fill: #6366f1; }
+.ana-axis-r { fill: #22c55e; }
 
 /* Platform bars */
 .ana-platforms { background: var(--ac-surface); border: 1px solid var(--ac-border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
