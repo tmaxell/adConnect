@@ -126,13 +126,26 @@
   color: var(--ac-text);
   font-size: 14px;
 }
+/* The clickable nav items are <button>s — strip default button chrome so they
+   match the non-interactive <div> items (no grey box / border / system font). */
+button.ac-side-item {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: var(--ac-text);
+  text-align: left;
+  cursor: pointer;
+}
 .ac-side-item-main {
   display: flex;
   align-items: center;
   gap: 12px;
   min-width: 0;
 }
-.ac-side-item-active {
+.ac-side-item.ac-side-item-active {
   background: var(--ac-accent-soft);
   box-shadow: inset 2px 0 0 var(--ac-accent);
 }
