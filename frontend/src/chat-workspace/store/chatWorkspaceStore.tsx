@@ -48,7 +48,7 @@ interface ChatWorkspaceState {
   refreshSessions: () => Promise<void>;
   /** Clickable canvas: apply a patch to the draft (creates a session if needed). */
   updateDraft: (patch: Record<string, unknown>) => Promise<void>;
-  generateCreative: (params: { format: MetaFormat; media_type: MediaType; headline?: string | null; prompt?: string | null }) => Promise<CreativeResult | null>;
+  generateCreative: (params: { format: MetaFormat | "whatsapp_card"; media_type: MediaType; headline?: string | null; prompt?: string | null; card_index?: number | null }) => Promise<CreativeResult | null>;
   generateCopy: (params: { tone?: string | null; brief?: string | null; n?: number }) => Promise<CopyResult | null>;
   uploadCreative: (file: File) => Promise<CreativeResult | null>;
 }
@@ -310,7 +310,7 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
   );
 
   const generateCreativeAction = useCallback(
-    async (params: { format: MetaFormat; media_type: MediaType; headline?: string | null; prompt?: string | null }) => {
+    async (params: { format: MetaFormat | "whatsapp_card"; media_type: MediaType; headline?: string | null; prompt?: string | null; card_index?: number | null }) => {
       let sessionId = activeSessionId;
       if (!sessionId) sessionId = await createNewChat();
       userActedRef.current = true;
@@ -320,6 +320,7 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
           media_type: params.media_type === "video" ? "video" : "image",
           headline: params.headline ?? null,
           prompt: params.prompt ?? null,
+          card_index: params.card_index ?? null,
         });
         mergeDraftArtifact(result.draft);
         return result;

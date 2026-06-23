@@ -16,13 +16,18 @@ export interface BusinessProfile {
   description: string | null;
 }
 
-export type Channel = "sms" | "email" | "meta";
+export type Channel = "sms" | "email" | "meta" | "whatsapp";
 export type Demographics = "all" | "men" | "women";
 
 /** Network (auction/CPM) channels vs operator messaging channels. */
 export const NETWORK_CHANNELS_IDS: Channel[] = ["meta"];
 export function isNetworkChannel(channel: Channel | null): boolean {
   return channel != null && NETWORK_CHANNELS_IDS.includes(channel);
+}
+
+/** Channels with a dedicated creative step (Meta ad / WhatsApp carousel). */
+export function isRichCreativeChannel(channel: Channel | null): boolean {
+  return channel === "meta" || channel === "whatsapp";
 }
 
 export interface SegmentSpec {
@@ -71,6 +76,34 @@ export interface MetaCreative {
   prompt: string | null;
 }
 
+/** WhatsApp Business (operator carousel broadcast via BSP aggregator). */
+export type WhatsAppButtonType = "quick_reply" | "url";
+export interface WhatsAppButton {
+  type: WhatsAppButtonType;
+  label: string;
+  value: string | null;
+}
+export interface WhatsAppCard {
+  media_type: MediaType;
+  media_url: string | null;
+  media_source: "upload" | "generated" | null;
+  body: string | null;
+  buttons: WhatsAppButton[];
+}
+export type WhatsAppSenderMode = "shared" | "dedicated";
+export type WhatsAppTemplateStatus = "draft" | "pending" | "approved";
+export interface WhatsAppSpec {
+  template_category: "marketing" | "utility";
+  sender_mode: WhatsAppSenderMode;
+  sender_name: string | null;
+  cards: WhatsAppCard[];
+  auto_reply_enabled: boolean;
+  auto_reply_greeting: string | null;
+  opt_in_source: string | null;
+  template_status: WhatsAppTemplateStatus;
+}
+export const WA_MAX_CARDS = 10;
+
 export type AudienceMode = "advantage" | "manual";
 
 export interface MetaSpec {
@@ -114,6 +147,7 @@ export interface CampaignDraft {
   message: MessageSpec;
   cost: CostSpec;
   meta: MetaSpec;
+  whatsapp: WhatsAppSpec;
   audience_reach: number;
   price_per_message: number;
   estimated_cost: number;

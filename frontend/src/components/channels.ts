@@ -43,6 +43,16 @@ export const OPERATOR_CHANNELS: ChannelCard[] = [
     status: "available",
     pricePerMessage: 0.4,
   },
+  {
+    id: "whatsapp",
+    label: "WhatsApp Business",
+    description: "Карусель-рассылка через бота под аккаунтом оператора",
+    group: "operator",
+    status: "available",
+    pricePerMessage: 9,
+    audienceLanding: "WhatsApp opt-in (через агрегатора)",
+    note: "Открытие диалога платное, дальнейшая переписка с ботом — бесплатно",
+  },
 ];
 
 export const NETWORK_CHANNELS: ChannelCard[] = [

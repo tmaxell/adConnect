@@ -271,10 +271,11 @@ export interface CreativeResult {
   draft: CampaignDraft;
 }
 
-/** Mock-generate a creative for the given format → returns a placeholder asset URL. */
+/** Mock-generate a creative for the given format → returns a placeholder asset URL.
+ *  `card_index` targets a WhatsApp Business carousel card (format "whatsapp_card"). */
 export async function generateCreative(
   sessionId: string,
-  params: { format: string; media_type: "image" | "video"; headline?: string | null; prompt?: string | null },
+  params: { format: string; media_type: "image" | "video"; headline?: string | null; prompt?: string | null; card_index?: number | null },
 ): Promise<CreativeResult> {
   const data = await http<unknown>(
     `/api/sessions/${encodeURIComponent(sessionId)}/creative/generate`,

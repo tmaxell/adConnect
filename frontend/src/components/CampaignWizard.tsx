@@ -17,9 +17,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   isNetworkChannel,
+  WA_MAX_CARDS,
   type CampaignDraft,
+  type Channel,
   type MediaType,
   type MetaFormat,
+  type WhatsAppButton,
+  type WhatsAppCard,
   type WizardStep,
 } from "../types/campaign";
 import { NETWORK_CHANNELS, OPERATOR_CHANNELS, type ChannelCard } from "./channels";
@@ -27,7 +31,7 @@ import { useChatWorkspaceStore } from "../chat-workspace/store/chatWorkspaceStor
 import { getAudiences, getProfile, saveAudience, type AudienceItem } from "../api/chatApi";
 import type { BusinessProfile } from "../types/campaign";
 
-const CHANNEL_LABEL: Record<string, string> = { sms: "SMS", email: "Email", meta: "Meta" };
+const CHANNEL_LABEL: Record<string, string> = { sms: "SMS", email: "Email", meta: "Meta", whatsapp: "WhatsApp" };
 function channelLabel(c: string | null): string {
   return c ? CHANNEL_LABEL[c] ?? c.toUpperCase() : "—";
 }
@@ -175,12 +179,14 @@ const STEP_ORDER: Array<Exclude<WizardStep, "ready">> = [
   "brief", "channel", "segments", "message", "cost", "confirmation",
 ];
 
-function stepLabel(step: Exclude<WizardStep, "ready">, network: boolean): string {
+function stepLabel(step: Exclude<WizardStep, "ready">, channel: Channel | null): string {
+  const network = isNetworkChannel(channel);
+  const whatsapp = channel === "whatsapp";
   switch (step) {
     case "brief": return "Бриф";
     case "channel": return "Канал";
-    case "segments": return network ? "Аудитория" : "Сегменты";
-    case "message": return network ? "Креатив" : "Сообщение";
+    case "segments": return network || whatsapp ? "Аудитория" : "Сегменты";
+    case "message": return whatsapp ? "Карусель" : network ? "Креатив" : "Сообщение";
     case "cost": return "Стоимость";
     case "confirmation": return "Подтверждение";
   }
@@ -394,7 +400,6 @@ function StepBar({ draft, current, onJump }: {
   current: Exclude<WizardStep, "ready">;
   onJump: (s: Exclude<WizardStep, "ready">) => void;
 }) {
-  const network = isNetworkChannel(draft.channel);
   const reached = activeStep(draft);
   const reachedIdx = STEP_ORDER.indexOf(reached);
   const currentIdx = STEP_ORDER.indexOf(current);
@@ -417,7 +422,7 @@ function StepBar({ draft, current, onJump }: {
               onClick={() => clickable && onJump(step)}
             >
               <div className={`acw-step-bar${done ? " done" : ""}${active ? " active" : ""}`} />
-              <span className={`acw-step-label${done || active ? " on" : ""}`}>{stepLabel(step, network)}</span>
+              <span className={`acw-step-label${done || active ? " on" : ""}`}>{stepLabel(step, draft.channel)}</span>
             </button>
           );
         })}
@@ -430,11 +435,24 @@ function StepBar({ draft, current, onJump }: {
 
 function ReachPanel({ draft }: { draft: CampaignDraft }) {
   const network = isNetworkChannel(draft.channel);
+  const whatsapp = draft.channel === "whatsapp";
   return (
     <aside className="acw-reach">
       <div className="acw-reach-num">{fmt(draft.audience_reach || 0)}</div>
-      <div className="acw-reach-cap">{network ? "Custom Audience" : "Охват аудитории"}</div>
-      {network ? (
+      <div className="acw-reach-cap">{network ? "Custom Audience" : whatsapp ? "Достижимо в WhatsApp" : "Охват аудитории"}</div>
+      {whatsapp ? (
+        <>
+          <div className="acw-price-num">{draft.price_per_message || 0} ₽ <span className="acw-info">ⓘ</span></div>
+          <div className="acw-reach-cap">Цена за диалог</div>
+          {draft.cost.messages_count ? (
+            <>
+              <div className="acw-price-num acw-reach-imp">{fmt(draft.cost.messages_count)}</div>
+              <div className="acw-reach-cap">Ожидаемые диалоги</div>
+            </>
+          ) : null}
+          <div className="acw-hint">Переписка с ботом после открытия диалога — бесплатно.</div>
+        </>
+      ) : network ? (
         <>
           <div className="acw-price-num">{draft.cpm || 0} ₽ <span className="acw-info">ⓘ</span></div>
           <div className="acw-reach-cap">CPM (за 1000 показов)</div>
@@ -891,10 +909,61 @@ function OperatorSegmentsStep({ draft, api }: { draft: CampaignDraft; api: Wizar
   );
 }
 
+// ── WhatsApp Business — account/sender setup (mirrors Meta's account badge) ───────
+
+function WhatsAppSetup({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
+  const wa = draft.whatsapp;
+  const dedicated = wa.sender_mode === "dedicated";
+  return (
+    <>
+      <div className="acw-meta-account">
+        <span className="acw-meta-account-dot" />
+        Рассылка идёт через агрегатора (Woztell) под аккаунтом оператора — подключать свой
+        аккаунт WhatsApp не нужно. Шаблон проходит согласование в Meta.
+      </div>
+      <Field label="Отправитель" hint="Общий аккаунт оператора подходит большинству. Крупным рекламодателям оператор заводит выделенного отправителя со своим именем.">
+        <Segmented
+          value={wa.sender_mode}
+          onChange={(v) => api.update({ wa_sender_mode: v })}
+          disabled={api.busy}
+          options={[
+            { value: "shared", label: "AdConnect Promo (общий)" },
+            { value: "dedicated", label: "Выделенный отправитель" },
+          ]}
+        />
+        {dedicated && (
+          <div className="acw-sub-field">
+            <EditableText
+              value={wa.sender_name}
+              placeholder="Отображаемое имя отправителя (например, бренд)"
+              onCommit={(v) => api.update({ wa_sender_name: v })}
+              disabled={api.busy}
+            />
+            <div className="acw-hint">Выделенного отправителя и его верификацию готовит оператор через агрегатора.</div>
+          </div>
+        )}
+      </Field>
+    </>
+  );
+}
+
+function WhatsAppAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
+  return (
+    <>
+      <WhatsAppSetup draft={draft} api={api} />
+      <div className="acw-source-card">
+        <span className="acw-source-tag">opt-in</span>
+        <span>Сообщения уходят только подписчикам с WhatsApp, давшим согласие (покрытие ≈ 70% базы).</span>
+      </div>
+      <OperatorSegmentsStep draft={draft} api={api} />
+    </>
+  );
+}
+
 function SegmentsStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
-  return isNetworkChannel(draft.channel)
-    ? <MetaAudienceStep draft={draft} api={api} />
-    : <OperatorSegmentsStep draft={draft} api={api} />;
+  if (isNetworkChannel(draft.channel)) return <MetaAudienceStep draft={draft} api={api} />;
+  if (draft.channel === "whatsapp") return <WhatsAppAudienceStep draft={draft} api={api} />;
+  return <OperatorSegmentsStep draft={draft} api={api} />;
 }
 
 // ── Message / creative step ──────────────────────────────────────────────────────
@@ -1073,9 +1142,180 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
   );
 }
 
+// ── WhatsApp Business — carousel creative step ───────────────────────────────────
+
+function WhatsAppButtonsEditor({ card, index, api, disabled }: {
+  card: WhatsAppCard; index: number; api: WizardApi; disabled?: boolean;
+}) {
+  const setButtons = (buttons: WhatsAppButton[]) => api.update({ wa_card_buttons: { index, buttons } });
+  const update = (i: number, patch: Partial<WhatsAppButton>) =>
+    setButtons(card.buttons.map((b, j) => (j === i ? { ...b, ...patch } : b)));
+  const remove = (i: number) => setButtons(card.buttons.filter((_, j) => j !== i));
+  const add = () => setButtons([...card.buttons, { type: "quick_reply", label: "Подробнее", value: null }]);
+  return (
+    <div className="acw-wa-buttons">
+      {card.buttons.map((b, i) => (
+        <div key={i} className="acw-wa-button-row">
+          <Segmented
+            value={b.type}
+            onChange={(v) => update(i, { type: v, value: v === "url" ? b.value : null })}
+            disabled={disabled}
+            options={[{ value: "quick_reply", label: "Ответ" }, { value: "url", label: "Ссылка" }]}
+          />
+          <div className="acw-wa-btn-fields">
+            <EditableText value={b.label} placeholder="Текст кнопки" disabled={disabled}
+              onCommit={(v) => update(i, { label: v })} />
+            {b.type === "url" && (
+              <EditableText value={b.value} placeholder="https://" disabled={disabled}
+                onCommit={(v) => update(i, { value: v })} />
+            )}
+          </div>
+          <button type="button" className="acw-chip-x" disabled={disabled} onClick={() => remove(i)} aria-label="Удалить">×</button>
+        </div>
+      ))}
+      {card.buttons.length < 2 && (
+        <button type="button" className="acw-btn acw-btn-ghost acw-wa-add-btn" disabled={disabled} onClick={add}>＋ Кнопка</button>
+      )}
+    </div>
+  );
+}
+
+function WhatsAppCardEditor({ draft, api, index, disabled, onGen }: {
+  draft: CampaignDraft; api: WizardApi; index: number; disabled?: boolean; onGen: (i: number) => void;
+}) {
+  const card = draft.whatsapp.cards[index];
+  return (
+    <div className="acw-wa-card">
+      <div className="acw-wa-card-head">
+        <span className="acw-wa-card-num">Карточка {index + 1}</span>
+        <button type="button" className="acw-chip-x" disabled={disabled} onClick={() => api.update({ wa_remove_card: index })} aria-label="Удалить карточку">×</button>
+      </div>
+      <div className="acw-wa-card-media">
+        {card.media_url
+          ? <img src={card.media_url} className="acw-wa-card-img" alt="card" />
+          : <div className="acw-adpreview-empty">1:1</div>}
+      </div>
+      <button type="button" className="acw-btn acw-btn-ghost acw-media-btn" disabled={disabled} onClick={() => onGen(index)}>
+        <IconPhoto />{card.media_url ? "Перегенерировать фото" : "Сгенерировать фото"}
+      </button>
+      <EditableText value={card.body} placeholder="Текст карточки…" multiline disabled={disabled}
+        onCommit={(v) => api.update({ wa_card_body: { index, body: v } })} />
+      <WhatsAppButtonsEditor card={card} index={index} api={api} disabled={disabled} />
+    </div>
+  );
+}
+
+function WhatsAppPreview({ draft }: { draft: CampaignDraft }) {
+  const wa = draft.whatsapp;
+  const sender = wa.sender_mode === "dedicated" ? (wa.sender_name || "Ваш бренд") : "AdConnect Promo";
+  return (
+    <div className="acw-wa-preview">
+      <div className="acw-wa-preview-head">
+        <span className="acw-wa-preview-avatar" />
+        <span className="acw-wa-preview-name">{sender}</span>
+        <span className="acw-wa-preview-badge">бот</span>
+      </div>
+      <div className="acw-wa-preview-body">
+        {wa.cards.length === 0 ? (
+          <div className="acw-hint">Соберите карусель, чтобы увидеть превью сообщения.</div>
+        ) : (
+          <div className="acw-wa-preview-carousel">
+            {wa.cards.map((c, i) => (
+              <div key={i} className="acw-wa-preview-card">
+                {c.media_url
+                  ? <img src={c.media_url} className="acw-wa-preview-img" alt="card" />
+                  : <div className="acw-wa-preview-img acw-wa-preview-empty">1:1</div>}
+                {c.body && <div className="acw-wa-preview-text">{c.body}</div>}
+                {c.buttons.map((b, j) => <div key={j} className="acw-wa-preview-btn">{b.label}</div>)}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WhatsAppCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
+  const { generateCreative, generateCopy } = useChatWorkspaceStore();
+  const [tone, setTone] = useState("recommended");
+  const [busy, setBusy] = useState(false);
+  const wa = draft.whatsapp;
+  const disabled = api.busy || busy;
+
+  const genCardImage = async (index: number) => {
+    setBusy(true);
+    try {
+      const body = draft.whatsapp.cards[index]?.body ?? null;
+      await generateCreative({ format: "whatsapp_card", media_type: "image", card_index: index, headline: body });
+    } finally { setBusy(false); }
+  };
+
+  const buildCarousel = async () => {
+    setBusy(true);
+    try {
+      const copy = await generateCopy({ tone });
+      const variants = copy?.variants ?? [];
+      const n = Math.max(1, Math.min(3, variants.length || 3));
+      for (let i = 0; i < n; i += 1) {
+        const body = variants[i] ?? null;
+        if (body) await api.update({ wa_card_body: { index: i, body } });
+        await generateCreative({ format: "whatsapp_card", media_type: "image", card_index: i, headline: body });
+      }
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <>
+      <div className="acw-objective-pill">Шаблон: <b>маркетинговая карусель</b> · до {WA_MAX_CARDS} карточек</div>
+
+      <Field label="Карусель" hint="Каждая карточка — изображение 1:1, текст и до 2 кнопок. Соберите автоматически или отредактируйте вручную.">
+        <div className="acw-gen-row">
+          <div className="acw-tone">
+            {TONES.map((t) => (
+              <button key={t.id} type="button" className={`acw-tone-chip${tone === t.id ? " on" : ""}`}
+                disabled={disabled} onClick={() => setTone(t.id)}>{t.label}</button>
+            ))}
+          </div>
+          <button type="button" className="acw-btn acw-btn-primary acw-gen-btn" disabled={disabled} onClick={buildCarousel}>
+            {busy ? <Spinner /> : "✦"} Собрать карусель
+          </button>
+        </div>
+
+        <div className="acw-wa-cards">
+          {wa.cards.map((_, i) => (
+            <WhatsAppCardEditor key={i} draft={draft} api={api} index={i} disabled={disabled} onGen={genCardImage} />
+          ))}
+          {wa.cards.length < WA_MAX_CARDS && (
+            <button type="button" className="acw-wa-add-card" disabled={disabled} onClick={() => api.update({ wa_add_card: {} })}>
+              ＋ Добавить карточку
+            </button>
+          )}
+        </div>
+      </Field>
+
+      <Field label="Автоответы бота" hint="Когда абонент отвечает или жмёт кнопку, бот оператора продолжает диалог бесплатно (24 ч).">
+        <div className="acw-toggle-row">
+          <span>Включить автоответ</span>
+          <Toggle on={wa.auto_reply_enabled} onClick={() => api.update({ toggle_wa_auto_reply: true })} disabled={disabled} />
+        </div>
+        {wa.auto_reply_enabled && (
+          <div className="acw-sub-field">
+            <EditableText value={wa.auto_reply_greeting} multiline disabled={disabled}
+              placeholder="Приветствие бота — например: «Здравствуйте! Расскажу подробнее об акции.»"
+              onCommit={(v) => api.update({ wa_greeting: v })} />
+          </div>
+        )}
+      </Field>
+
+      <WhatsAppPreview draft={draft} />
+    </>
+  );
+}
+
 function MessageStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
-  const network = isNetworkChannel(draft.channel);
-  if (network) return <MetaCreativeStep draft={draft} api={api} />;
+  if (isNetworkChannel(draft.channel)) return <MetaCreativeStep draft={draft} api={api} />;
+  if (draft.channel === "whatsapp") return <WhatsAppCreativeStep draft={draft} api={api} />;
   const { generateCopy } = useChatWorkspaceStore();
   const [tone, setTone] = useState("recommended");
   const [genBusy, setGenBusy] = useState(false);
@@ -1130,6 +1370,7 @@ function MessageStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
 function CostStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   const c = draft.cost;
   const network = isNetworkChannel(draft.channel);
+  const whatsapp = draft.channel === "whatsapp";
   return (
     <>
       <Field label="Бюджет">
@@ -1149,11 +1390,14 @@ function CostStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
           <div className="acw-sub-field">
             <EditableText
               value={c.messages_count != null ? String(c.messages_count) : null}
-              placeholder="Число сообщений"
+              placeholder={whatsapp ? "Число диалогов" : "Число сообщений"}
               type="number"
               onCommit={(v) => api.update({ messages_count: v })}
               disabled={api.busy}
             />
+            {whatsapp && (
+              <div className="acw-hint">Платится открытие диалога ({draft.price_per_message} ₽); дальнейшая переписка с ботом — бесплатно.</div>
+            )}
           </div>
         )}
       </Field>
@@ -1174,6 +1418,7 @@ function CostStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
 function ConfirmationStep({ draft }: { draft: CampaignDraft }) {
   const s = draft.segments;
   const network = isNetworkChannel(draft.channel);
+  const whatsapp = draft.channel === "whatsapp";
   const rows: Array<[string, string]> = [
     ["Канал", channelLabel(draft.channel)],
     ["Локации", s.geography.join(", ") || "Россия"],
@@ -1190,6 +1435,14 @@ function ConfirmationStep({ draft }: { draft: CampaignDraft }) {
     rows.push(["Custom Audience", fmt(draft.audience_reach)]);
     rows.push(["CPM", `${draft.cpm} ₽`]);
     rows.push(["Ожидаемые показы", fmt(draft.estimated_impressions)]);
+  } else if (whatsapp) {
+    const wa = draft.whatsapp;
+    rows.push(["Отправитель", wa.sender_mode === "dedicated" ? (wa.sender_name || "Выделенный") : "AdConnect Promo (общий)"]);
+    rows.push(["Шаблон", "Маркетинговая карусель"]);
+    rows.push(["Карточек", String(wa.cards.length)]);
+    rows.push(["Автоответы бота", wa.auto_reply_enabled ? "Включены" : "Нет"]);
+    rows.push(["Достижимо в WhatsApp", fmt(draft.audience_reach)]);
+    rows.push(["Цена за диалог", `${draft.price_per_message} ₽`]);
   } else {
     rows.push(["Доход", s.monthly_income || "—"]);
     rows.push(["Возраст детей", s.children_age.join(", ") || "—"]);
@@ -1214,6 +1467,11 @@ function ConfirmationStep({ draft }: { draft: CampaignDraft }) {
               <div className="acw-hint">{creative.media_source === "generated" ? "Сгенерировано" : "Загружено"}</div>
             </div>
           </div>
+        </Field>
+      )}
+      {whatsapp && draft.whatsapp.cards.length > 0 && (
+        <Field label="Карусель">
+          <WhatsAppPreview draft={draft} />
         </Field>
       )}
       <Field label="Название кампании">

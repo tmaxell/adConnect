@@ -33,9 +33,9 @@ const OBJECTIVE_LABEL: Record<string, string> = {
   awareness: "Узнаваемость", traffic: "Трафик", engagement: "Вовлечённость",
   leads: "Лиды", sales: "Продажи",
 };
-const CHANNEL_LABEL: Record<string, string> = { sms: "SMS", email: "Email", meta: "Meta" };
+const CHANNEL_LABEL: Record<string, string> = { sms: "SMS", email: "Email", meta: "Meta", whatsapp: "WhatsApp" };
 const CHANNEL_COLOR: Record<string, string> = {
-  meta: "#5257ff", sms: "#0ea5e9", email: "#f59e0b", other: "#94a3b8",
+  meta: "#5257ff", sms: "#0ea5e9", email: "#f59e0b", whatsapp: "#25D366", other: "#94a3b8",
 };
 
 const num = (n: number) => n.toLocaleString("ru-RU").replace(/,/g, " ");

@@ -298,7 +298,7 @@ function mapStatus(status: string): CampaignRow["status"] {
   return "draft";
 }
 
-const CHANNEL_LABELS: Record<string, string> = { sms: "SMS", email: "Email", meta: "Meta" };
+const CHANNEL_LABELS: Record<string, string> = { sms: "SMS", email: "Email", meta: "Meta", whatsapp: "WhatsApp" };
 
 function campaignToRow(c: CampaignSummary): CampaignRow {
   const price = c.estimatedCost > 0 ? c.estimatedCost : c.budget ?? 0;
