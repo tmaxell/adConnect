@@ -56,8 +56,13 @@ adapters come online:
 2. **Match-rate & delay expectations.** For Meta/Google, warn that ~up to 24h
    processing applies and that match rate reduces effective reach — so the
    "fast launch" promise is set correctly.
-3. **WhatsApp is not a separate channel.** It appears as a sub-option *inside* Meta
-   (Click-to-WhatsApp), never as a top-level card.
+3. **Two distinct WhatsApp surfaces.** (a) *Inside Meta* — the WhatsApp **placement**
+   (Status ads / Click-to-WhatsApp), bought in the Meta auction; never its own Meta
+   card. (b) A separate **operator channel** "WhatsApp Business" — a marketing
+   **carousel broadcast** to opted-in subscribers through a BSP aggregator (priced
+   per delivered message, with the operator bot continuing the chat for free). The
+   operator channel *is* a top-level card in the channel step; see
+   `whatsapp_channel_plan.md`.
 4. **Unified budget split.** Once multiple destinations are selectable, the Cost
    step shows one wallet budget with a recommended **split across networks**
    (forecast agent), each line reserving from the same wallet. Per-network minimums

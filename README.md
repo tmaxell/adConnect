@@ -73,6 +73,12 @@ generate or upload an image/video, with a live ad preview. The canvas and the ag
 edit the same draft. See `docs/creative_generation_and_backend.md` for the Meta
 creative-API research, the interactive endpoints, and the production-scaling sketch.
 
+Operator channels are **SMS**, **Email** and **WhatsApp Business** — a carousel
+broadcast through a BSP aggregator (Woztell-style) under the operator's account,
+priced per opened dialog with the operator bot continuing the chat for free. It has
+its own creative step (a carousel of up to 10 cards) built by analogy with Meta; see
+`docs/whatsapp_channel_plan.md`.
+
 The **Statistics** screen is an analytics dashboard: account-level KPIs (spend,
 impressions, CTR, results, cost per result), a 14-day trend chart, a per-platform
 split and a per-campaign table; drill into a campaign for its metrics, ROAS and
