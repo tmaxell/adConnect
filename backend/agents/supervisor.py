@@ -35,6 +35,10 @@ _ACTION_AGENT: dict[str, str] = {
     "select_format": "campaign_builder",
     "select_creative": "campaign_builder",
     "skip_creatives": "campaign_builder",
+    # WhatsApp Business channel actions.
+    "select_wa_sender": "campaign_builder",
+    "toggle_wa_auto_reply": "campaign_builder",
+    "generate_wa_carousel": "campaign_builder",
     "submit_campaign": "campaign_builder",
 }
 

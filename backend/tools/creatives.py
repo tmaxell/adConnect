@@ -29,6 +29,12 @@ def _fallback_variants(product: str, goal: str, channel: str, offer: str | None 
             f"Только для вас: {subject}.{promo} Оставьте заявку сегодня.",
             f"Не пропустите {subject}.{promo} Успейте до конца недели.",
         ]
+    if channel == "whatsapp":
+        return [
+            f"{subject}:{promo} Нажмите кнопку — расскажем подробнее в чате.",
+            f"{subject} —{promo} Ответьте «Хочу», и подберём вариант для вас.",
+            f"Только для подписчиков: {subject}.{promo} Узнайте больше в один тап.",
+        ]
     return [
         f"{subject}:{promo} Подробности по ссылке.",
         f"{subject} —{promo} Оставьте заявку сегодня.",
@@ -45,6 +51,7 @@ Rules:
 - SMS: each variant <= 160 characters, punchy, one call to action.
 - Email: each variant is a single subject-style line, slightly longer is fine.
 - Meta (Facebook/Instagram/WhatsApp): 1-2 short sentences of primary ad text with a clear call to action.
+- WhatsApp Business (carousel card): 1-2 short, friendly sentences for one carousel card; end with a button-style call to action (e.g. "Узнать подробнее"); no links or phone numbers in the text.
 - If an offer is given, make it concrete and prominent. Mention the brand naturally when provided.
 - No emojis, no placeholders, no markdown. Each variant must stand alone.
 {tone_line}Return STRICT JSON: {{"variants": ["...", "...", "..."]}}"""

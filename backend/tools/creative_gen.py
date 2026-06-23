@@ -24,6 +24,7 @@ _RATIO = {
     "stories": (1080, 1920),    # 9:16 full-screen
     "reels": (1080, 1920),      # 9:16 full-screen
     "whatsapp": (1080, 1080),   # Click-to-WhatsApp ad uses a feed-style 1:1 image
+    "whatsapp_card": (1080, 1080),  # WhatsApp Business carousel card (1:1)
 }
 
 # A small palette of gradient pairs so successive generations look distinct.

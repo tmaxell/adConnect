@@ -26,7 +26,7 @@ import time
 from typing import Any
 
 from agents.base import AgentContext, AgentResult
-from schemas import META_PLACEMENTS, CampaignDraft, ChatAction
+from schemas import META_PLACEMENTS, CampaignDraft, ChatAction, WhatsAppButton, WhatsAppCard
 from tools import context
 from tools import creative_gen
 from tools import creatives as creatives_tool
@@ -150,9 +150,22 @@ async def _handle_action(ctx: AgentContext, draft: CampaignDraft, action_id: str
         return None
 
     if action_id == "select_channel":
-        if payload.get("channel") in ("sms", "email", "meta"):
+        if payload.get("channel") in ("sms", "email", "meta", "whatsapp"):
             draft.channel = payload["channel"]
         return None
+
+    if action_id == "select_wa_sender":
+        mode = payload.get("sender_mode")
+        if mode in ("shared", "dedicated"):
+            draft.whatsapp.sender_mode = mode
+        return None
+
+    if action_id == "toggle_wa_auto_reply":
+        draft.whatsapp.auto_reply_enabled = not draft.whatsapp.auto_reply_enabled
+        return None
+
+    if action_id == "generate_wa_carousel":
+        return await _generate_wa_carousel(ctx, draft)
 
     if action_id == "toggle_lookalike":
         draft.meta.lookalike = not draft.meta.lookalike
@@ -279,6 +292,37 @@ async def _generate_creatives(ctx: AgentContext, draft: CampaignDraft) -> AgentR
     return _wrap(draft, "\n".join(lines), actions, substep="message")
 
 
+async def _generate_wa_carousel(ctx: AgentContext, draft: CampaignDraft, *, n: int = 3) -> AgentResult:
+    """Assemble a WhatsApp Business carousel: copy variants → cards with images."""
+    draft.channel = "whatsapp"
+    variants = await creatives_tool.generate_creatives(**await _copy_context(ctx, draft))
+    draft.message.variants = variants                      # keep the pool for the canvas
+    cards: list[WhatsAppCard] = []
+    for i, body in enumerate(variants[:n]):
+        url = creative_gen.save_generated(
+            fmt="whatsapp_card", media_type="image", headline=body, brand=draft.product, seed=i,
+        )
+        cards.append(WhatsAppCard(
+            media_type="image", media_url=url, media_source="generated", body=body,
+            buttons=[WhatsAppButton(type="quick_reply", label="Подробнее")],
+        ))
+    draft.whatsapp.cards = cards
+    await ctx.emit("tool_called", detail=f"generate_wa_carousel → {len(cards)} card(s)")
+
+    lines = [f"Собрал карусель из **{len(cards)}** карточек для WhatsApp Business:\n"]
+    for i, c in enumerate(cards):
+        lines.append(f"{i + 1}. {c.body}")
+    lines.append(
+        "\nКаждая карточка — изображение, текст и кнопка. Отредактируйте на холсте "
+        "(текст, медиа, кнопки, число карточек) или перегенерируйте."
+    )
+    apply_forecast(draft)
+    return _wrap(draft, "\n".join(lines), [
+        ChatAction(id="generate_wa_carousel", label="Перегенерировать карусель", kind="default", payload={}),
+        ChatAction(id="generate_creatives", label="Сгенерировать только тексты", kind="default", payload={}),
+    ], substep="message")
+
+
 async def _ensure_ad_text(ctx: AgentContext, draft: CampaignDraft) -> str:
     """Guarantee the draft has ad copy (generate a variant if empty)."""
     if draft.message.text:
@@ -356,6 +400,8 @@ async def _submit(ctx: AgentContext, draft: CampaignDraft) -> AgentResult:
         )
     draft.status = "submitted"
     draft.step = "ready"
+    if draft.channel == "whatsapp":
+        draft.whatsapp.template_status = "pending"
 
     # Persist the campaign so it shows up in the Ad Campaigns list.
     campaign_id = await ctx.store.save_campaign(
@@ -364,11 +410,18 @@ async def _submit(ctx: AgentContext, draft: CampaignDraft) -> AgentResult:
     await ctx.store.set_campaign_id(session_id=ctx.session_id, campaign_id=campaign_id)
     await ctx.emit("run_completed", detail=f"campaign #{campaign_id} submitted for moderation")
 
-    msg = (
-        f"Кампания **«{draft.name}»** собрана и отправлена на модерацию. "
-        f"Списания и запуска не произошло — это произойдёт только после вашего подтверждения "
-        f"и прохождения модерации.\n\n{_summary(draft)}"
-    )
+    if draft.channel == "whatsapp":
+        msg = (
+            f"Кампания **«{draft.name}»** собрана. Шаблон карусели отправлен на согласование в Meta "
+            f"через агрегатора (обычно до 24 ч). Рассылки и списания не произошло — это произойдёт "
+            f"только после одобрения шаблона и вашего подтверждения.\n\n{_summary(draft)}"
+        )
+    else:
+        msg = (
+            f"Кампания **«{draft.name}»** собрана и отправлена на модерацию. "
+            f"Списания и запуска не произошло — это произойдёт только после вашего подтверждения "
+            f"и прохождения модерации.\n\n{_summary(draft)}"
+        )
     return AgentResult(
         assistant_message=msg, actions=[], status="ok",
         metadata={"stage": "done", "campaign_id": campaign_id},
@@ -427,16 +480,20 @@ def _wrap(draft: CampaignDraft, message: str, actions: list[ChatAction], *,
 
 def _ask_channel(draft: CampaignDraft) -> AgentResult:
     meta = CHANNELS["meta"]
+    wa = CHANNELS["whatsapp"]
     msg = (
         f"{_intro_line(draft)}Начнём с **канала**. Где показываем рекламу?\n\n"
         f"- **SMS** — мгновенный контакт, {CHANNELS['sms'].base_price_per_message} ₽/сообщение.\n"
         f"- **Email** — для длинных сообщений, {CHANNELS['email'].base_price_per_message} ₽/сообщение.\n"
+        f"- **WhatsApp Business** — карусель-рассылка через бота под аккаунтом оператора "
+        f"(агрегатор). ≈ {wa.base_price_per_message:.0f} ₽ за диалог; дальнейшая переписка с ботом — бесплатно.\n"
         f"- **Meta Ads** — Facebook, Instagram и WhatsApp. Ваша аудитория загружается как "
         f"Custom Audience (по хешам телефонов), оплата за показы (CPM ≈ {meta.avg_cpm:.0f} ₽)."
     )
     actions = [
         ChatAction(id="select_channel", label="SMS", kind="primary", payload={"channel": "sms"}),
         ChatAction(id="select_channel", label="Email", kind="primary", payload={"channel": "email"}),
+        ChatAction(id="select_channel", label="WhatsApp Business", kind="primary", payload={"channel": "whatsapp"}),
         ChatAction(id="select_channel", label="Meta Ads", kind="primary", payload={"channel": "meta"}),
     ]
     return _wrap(draft, msg, actions)
@@ -446,7 +503,18 @@ def _ask_segments(draft: CampaignDraft) -> AgentResult:
     prefilled = _audience_hint(draft)
     hint = f" Пока ориентируюсь на: {prefilled}." if prefilled else ""
 
-    if is_network_channel(draft.channel):
+    if draft.channel == "whatsapp":
+        ci = CHANNELS["whatsapp"]
+        sender = "общий аккаунт оператора «AdConnect Promo»" if draft.whatsapp.sender_mode == "shared" \
+            else (f"выделенный отправитель «{draft.whatsapp.sender_name}»" if draft.whatsapp.sender_name
+                  else "выделенный отправитель")
+        msg = (
+            f"Канал: **{ci.label}**. Отправка идёт через агрегатора под {sender} — подключать свой "
+            f"аккаунт не нужно. Теперь — **аудитория**.{hint}\n\n"
+            f"Опишите, кого охватить (гео, возраст, интересы), либо я подберу сегмент абонентской базы. "
+            f"Сообщения уйдут только подписчикам с WhatsApp (покрытие ≈ {ci.coverage * 100:.0f}% базы, opt-in)."
+        )
+    elif is_network_channel(draft.channel):
         ci = CHANNELS[draft.channel]
         geo = ", ".join(draft.segments.geography)
         geo_line = (
@@ -508,6 +576,21 @@ def _audience_hint(draft: CampaignDraft) -> str:
 
 def _ask_message(draft: CampaignDraft) -> AgentResult:
     reach = f"{draft.audience_reach:,}".replace(",", " ")
+    if draft.channel == "whatsapp":
+        price_line = (
+            f"достижимая аудитория ≈ **{reach}**, цена **{draft.price_per_message:.0f} ₽** за диалог "
+            f"(открытие чата; дальнейшая переписка с ботом — бесплатно)"
+        )
+        msg = (
+            f"Аудитория готова: {price_line}.\n\n"
+            f"Теперь **карусель** — до 10 карточек, у каждой изображение, текст и кнопка. "
+            f"Соберу тексты и картинки под вашу цель, либо отредактируйте всё на холсте."
+        )
+        actions = [
+            ChatAction(id="generate_wa_carousel", label="Собрать карусель", kind="primary", payload={}),
+            ChatAction(id="generate_creatives", label="Сгенерировать тексты", kind="default", payload={}),
+        ]
+        return _wrap(draft, msg, actions, substep="message")
     if is_network_channel(draft.channel):
         cr = draft.meta.creative
         price_line = f"охват аудитории ≈ **{reach}**, оплата за показы (CPM ≈ {draft.cpm:.0f} ₽)"
@@ -538,7 +621,13 @@ def _ask_message(draft: CampaignDraft) -> AgentResult:
 
 
 def _ask_cost(draft: CampaignDraft) -> AgentResult:
-    if is_network_channel(draft.channel):
+    if draft.channel == "whatsapp":
+        msg = (
+            "Карусель готова. Теперь — **бюджет**.\n\n"
+            f"Укажите бюджет в рублях или число диалогов. При цене **{draft.price_per_message:.0f} ₽** "
+            f"за открытый диалог я посчитаю охват и стоимость. Переписка с ботом после открытия — бесплатно."
+        )
+    elif is_network_channel(draft.channel):
         msg = (
             "Объявление готово. Теперь — **бюджет**.\n\n"
             f"Укажите бюджет кампании в рублях. При CPM **{draft.cpm:.0f} ₽** я посчитаю "
@@ -578,6 +667,11 @@ def _summary(draft: CampaignDraft) -> str:
     seg = draft.segments
     reach = f"{draft.audience_reach:,}".replace(",", " ")
     network = is_network_channel(draft.channel)
+    whatsapp = draft.channel == "whatsapp"
+    if whatsapp:
+        creative_row = f"- **Карусель**: {len(draft.whatsapp.cards)} карточек"
+    else:
+        creative_row = f"- **{'Объявление' if network else 'Сообщение'}**: {draft.message.text or '—'}"
     rows = [
         f"- **Канал**: {CHANNELS[draft.channel].label if draft.channel else '—'}",
         f"- **Аудитория**: {seg.matched_segment_name or _audience_text(draft)}",
@@ -585,9 +679,21 @@ def _summary(draft: CampaignDraft) -> str:
         f"- **Демография**: {seg.demographics}",
         f"- **Возраст**: {', '.join(seg.age) or '—'}",
         f"- **Интересы**: {', '.join(seg.interests) or '—'}",
-        f"- **{'Объявление' if network else 'Сообщение'}**: {draft.message.text or '—'}",
+        creative_row,
     ]
-    if network:
+    if whatsapp:
+        wa = draft.whatsapp
+        sender = "AdConnect Promo (общий)" if wa.sender_mode == "shared" \
+            else (wa.sender_name or "выделенный отправитель")
+        rows += [
+            f"- **Отправитель**: {sender}",
+            f"- **Категория шаблона**: {wa.template_category}",
+            f"- **Автоответы бота**: {'включены' if wa.auto_reply_enabled else 'нет'}",
+            f"- **Достижимая аудитория**: ≈ {reach}",
+            f"- **Цена за диалог**: {draft.price_per_message:.0f} ₽",
+            f"- **Бюджет**: {_budget_text(draft)}",
+        ]
+    elif network:
         impressions = f"{draft.estimated_impressions:,}".replace(",", " ")
         placement_labels = {b.platform: b.label for b in draft.platform_breakdown}
         placements = ", ".join(placement_labels.get(p, p) for p in draft.meta.placements) or "Facebook, Instagram"

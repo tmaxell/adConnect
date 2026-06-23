@@ -152,3 +152,44 @@ def test_generate_svg_dimensions_and_escaping():
     assert 'width="1080" height="1920"' in svg     # 9:16 stories
     assert "&amp;" in svg and "&lt;" in svg          # escaped
     assert "<polygon" in svg                          # play affordance for video
+
+
+# ── WhatsApp Business patches ─────────────────────────────────────────────────
+
+def test_whatsapp_select_channel_and_sender():
+    d = CampaignDraft()
+    apply_patch(d, {"channel": "whatsapp", "wa_sender_mode": "dedicated", "wa_sender_name": "ФитЛаб"})
+    assert d.channel == "whatsapp"
+    assert d.whatsapp.sender_mode == "dedicated" and d.whatsapp.sender_name == "ФитЛаб"
+
+
+def test_whatsapp_card_add_edit_remove_and_cap():
+    d = CampaignDraft(channel="whatsapp")
+    apply_patch(d, {"wa_add_card": {}})
+    apply_patch(d, {"wa_card_body": {"index": 0, "body": "Первый месяц бесплатно"}})
+    apply_patch(d, {"wa_card_media": {"index": 0, "media_type": "image",
+                                      "media_url": "/api/uploads/c.svg", "media_source": "generated"}})
+    apply_patch(d, {"wa_card_buttons": {"index": 0, "buttons": [
+        {"type": "quick_reply", "label": "Подробнее"},
+        {"type": "url", "label": "Сайт", "value": "https://x"},
+        {"type": "quick_reply", "label": "Третья — лишняя"},   # capped at 2
+    ]}})
+    card = d.whatsapp.cards[0]
+    assert card.body == "Первый месяц бесплатно" and card.media_url == "/api/uploads/c.svg"
+    assert len(card.buttons) == 2 and card.buttons[1].value == "https://x"
+    assert d.whatsapp.is_specified()
+    assert d.current_step() != "message"  # card has media+text → creative ready
+
+    # Card cap at WA_MAX_CARDS (10).
+    for _ in range(20):
+        apply_patch(d, {"wa_add_card": {}})
+    assert len(d.whatsapp.cards) == 10
+    apply_patch(d, {"wa_remove_card": 0})
+    assert len(d.whatsapp.cards) == 9
+
+
+def test_whatsapp_auto_reply_toggle():
+    d = CampaignDraft(channel="whatsapp")
+    apply_patch(d, {"toggle_wa_auto_reply": True, "wa_greeting": "Здравствуйте!"})
+    assert d.whatsapp.auto_reply_enabled is True
+    assert d.whatsapp.auto_reply_greeting == "Здравствуйте!"

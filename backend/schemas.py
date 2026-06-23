@@ -162,7 +162,7 @@ class AnalyticsSummary(BaseModel):
 WizardStep = Literal["brief", "channel", "segments", "message", "cost", "confirmation", "ready"]
 WIZARD_STEPS: tuple[WizardStep, ...] = ("brief", "channel", "segments", "message", "cost", "confirmation")
 
-Channel = Literal["sms", "email", "meta"]
+Channel = Literal["sms", "email", "meta", "whatsapp"]
 Demographics = Literal["all", "men", "women"]
 
 
@@ -263,6 +263,64 @@ class MetaSpec(BaseModel):
     creative: MetaCreative = Field(default_factory=MetaCreative)
 
 
+# ── WhatsApp Business channel (operator broadcast via BSP aggregator) ──────────
+# A *separate operator channel* (not the Meta `whatsapp` placement): an approved
+# MARKETING template — optionally a carousel of up to 10 cards — broadcast to
+# opted-in subscribers through a BSP aggregator (e.g. Woztell) under the operator's
+# WABA. Priced per delivered message; the operator's bot then continues the chat
+# for free inside the 24h service window. This is NOT a chatbot builder — the
+# advertiser composes the broadcast and (optionally) a light auto-reply.
+
+WhatsAppButtonType = Literal["quick_reply", "url"]
+
+
+class WhatsAppButton(BaseModel):
+    """A template button: a quick reply (handled by the operator bot) or a URL."""
+    type: WhatsAppButtonType = "quick_reply"
+    label: str
+    value: str | None = None        # URL for "url"; reply payload/text for "quick_reply"
+
+
+class WhatsAppCard(BaseModel):
+    """One carousel card: media (1:1) + body text + up to 2 buttons."""
+    media_type: MediaType = "image"
+    media_url: str | None = None
+    media_source: Literal["upload", "generated"] | None = None
+    body: str | None = None
+    buttons: list[WhatsAppButton] = Field(default_factory=list)
+
+    def is_specified(self) -> bool:
+        return bool((self.body and self.body.strip()) or self.media_url)
+
+
+WhatsAppSenderMode = Literal["shared", "dedicated"]
+WhatsAppTemplateStatus = Literal["draft", "pending", "approved"]
+
+# Carousel size cap (Meta allows up to 10 cards per media-card carousel template).
+WA_MAX_CARDS = 10
+
+
+class WhatsAppSpec(BaseModel):
+    """WhatsApp Business config: sender (account model), carousel template, light bot."""
+    template_category: Literal["marketing", "utility"] = "marketing"
+    # Sender / account model under the operator's WABA via the aggregator:
+    # shared = the operator's common sender ("AdConnect Promo"); dedicated = the
+    # advertiser's own display name, provisioned by the operator (large advertisers).
+    sender_mode: WhatsAppSenderMode = "shared"
+    sender_name: str | None = None          # display name when sender_mode == "dedicated"
+    cards: list[WhatsAppCard] = Field(default_factory=list)
+    # Light automation handled by the operator's bot (free 24h service window) —
+    # a single greeting, not a flow builder. Optional.
+    auto_reply_enabled: bool = False
+    auto_reply_greeting: str | None = None
+    opt_in_source: str | None = None        # how subscribers opted in (note)
+    template_status: WhatsAppTemplateStatus = "draft"
+
+    def is_specified(self) -> bool:
+        """The creative step is complete once at least one card has media or text."""
+        return any(c.is_specified() for c in self.cards)
+
+
 class BusinessProfile(BaseModel):
     """Durable advertiser context, set once and used to pre-fill every campaign brief."""
     company_name: str | None = None
@@ -325,6 +383,7 @@ class CampaignDraft(BaseModel):
     message: MessageSpec = Field(default_factory=MessageSpec)
     cost: CostSpec = Field(default_factory=CostSpec)
     meta: MetaSpec = Field(default_factory=MetaSpec)   # used when channel == "meta"
+    whatsapp: WhatsAppSpec = Field(default_factory=WhatsAppSpec)  # used when channel == "whatsapp"
 
     audience_reach: int = 0
     price_per_message: float = 0.0        # messaging channels (SMS/Email)
@@ -349,11 +408,17 @@ class CampaignDraft(BaseModel):
             return "channel"
         if not self.segments.is_ready():
             return "segments"
-        if not self.message.is_specified():
+        if not self._is_message_ready():
             return "message"
         if not self.cost.is_specified():
             return "cost"
         return "confirmation"
+
+    def _is_message_ready(self) -> bool:
+        """Creative step readiness — a WhatsApp carousel card, else a message text."""
+        if self.channel == "whatsapp":
+            return self.whatsapp.is_specified()
+        return self.message.is_specified()
 
     def is_ready(self) -> bool:
         return self.current_step() == "confirmation"

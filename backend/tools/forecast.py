@@ -131,7 +131,37 @@ def estimate(draft: CampaignDraft) -> Forecast:
     channel = CHANNELS.get(draft.channel or "")
     if channel and channel.kind == "network":
         return _estimate_network(draft, channel)
+    if draft.channel == "whatsapp" and channel:
+        return _estimate_whatsapp(draft, channel)
     return _estimate_messaging(draft)
+
+
+def _estimate_whatsapp(draft: CampaignDraft, channel) -> Forecast:
+    """WhatsApp Business: a per-message marketing template broadcast.
+
+    Reachable audience = the narrowed operator segment × WhatsApp coverage (has
+    WhatsApp + opted in). Each delivered message is priced at the channel base
+    (the marketing-template rate); messages derive from the budget. Continuing the
+    conversation with the operator bot is free, so only the opening is billed.
+    """
+    seg = draft.segments
+    reachable = int(_narrow(_base_reach(seg), seg) * channel.coverage)
+    price = round(channel.base_price_per_message, 2)
+
+    if draft.cost.messages_count is not None:
+        messages = int(draft.cost.messages_count)
+    elif draft.cost.budget is not None and price > 0:
+        messages = int(draft.cost.budget // price)
+    else:
+        messages = 0
+    messages = min(messages, reachable) if reachable else messages
+
+    return Forecast(
+        audience_reach=reachable,
+        price_per_message=price,
+        messages_count=messages,
+        estimated_cost=round(messages * price, 2),
+    )
 
 
 def _estimate_messaging(draft: CampaignDraft) -> Forecast:

@@ -33,7 +33,7 @@ from pydantic import BaseModel, Field
 from agents.base import AgentContext
 from agents.supervisor import handle as supervisor_handle
 from db import ChatStore, init_db
-from schemas import CampaignDraft, ChatAction, ChatArtifact, ChatTraceEvent
+from schemas import CampaignDraft, ChatAction, ChatArtifact, ChatTraceEvent, WhatsAppCard
 from tools import analytics, catalog, context, creative_gen, creatives as creatives_tool, naming
 from tools.draft_ops import apply_patch
 from tools.forecast import apply_forecast
@@ -223,6 +223,7 @@ class CreativeGenerateRequest(BaseModel):
     headline: str | None = None
     prompt: str | None = None       # free-text generation brief
     brand: str | None = None
+    card_index: int | None = None   # WhatsApp Business: which carousel card to fill
 
 
 class CopyGenerateRequest(BaseModel):
@@ -281,12 +282,35 @@ async def generate_creative(session_id: str, request: CreativeGenerateRequest):
     if await store.ensure_session(session_id=session_id) is None:
         raise HTTPException(status_code=404, detail="Session not found")
     draft = await _load_latest_draft(session_id)
-    headline = request.headline or draft.message.text or draft.goal
     prompt = (request.prompt or "").strip() or None
+    seed = abs(hash(prompt)) % 997 if prompt else len(await store.list_artifacts(session_id=session_id))
+
+    # WhatsApp Business: a generated visual fills one carousel card (1:1), not the
+    # Meta creative. The channel is kept whatsapp and never flipped to meta.
+    is_whatsapp = draft.channel == "whatsapp" or request.format == "whatsapp_card" or request.card_index is not None
+    if is_whatsapp:
+        idx = request.card_index if request.card_index is not None else 0
+        while len(draft.whatsapp.cards) <= idx:
+            draft.whatsapp.cards.append(WhatsAppCard())
+        card = draft.whatsapp.cards[idx]
+        image_text = prompt or request.headline or card.body or draft.goal
+        url = creative_gen.save_generated(
+            fmt="whatsapp_card", media_type=request.media_type,
+            headline=image_text, brand=request.brand or draft.product, seed=seed,
+        )
+        draft.channel = "whatsapp"
+        card.media_type = request.media_type  # type: ignore[assignment]
+        card.media_url = url
+        card.media_source = "generated"
+        if request.headline and not card.body:
+            card.body = request.headline
+        content = await _recompute_and_save(session_id, draft)
+        return {"url": url, "media_type": request.media_type, "draft": content}
+
+    headline = request.headline or draft.message.text or draft.goal
     # The generated visual reflects the prompt when given (else the ad copy); the
     # prompt also seeds the placeholder so distinct briefs yield distinct images.
     image_text = prompt or headline
-    seed = abs(hash(prompt)) % 997 if prompt else len(await store.list_artifacts(session_id=session_id))
     url = creative_gen.save_generated(
         fmt=request.format, media_type=request.media_type,
         headline=image_text, brand=request.brand or draft.product, seed=seed,

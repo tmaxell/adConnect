@@ -179,3 +179,44 @@ async def test_audience_step_offered_even_when_prefilled(convo):
     await convo.send(action=action("keep_audience"))
     assert convo.draft["segments"]["audience_confirmed"] is True
     assert convo.draft["step"] == "message"
+
+
+async def test_whatsapp_carousel_flow(convo):
+    # "WhatsApp" (no FB/IG context) routes to the operator WhatsApp Business channel.
+    await convo.send("Создай рекламную кампанию в WhatsApp для фитнес-клуба")
+    assert convo.draft["channel"] == "whatsapp"
+    assert convo.draft["step"] == "segments"
+
+    # Keep the whole base → advance to the creative (carousel) step.
+    r1 = await convo.send(action=action("keep_audience"))
+    assert convo.draft["step"] == "message"
+    assert any(a.id == "generate_wa_carousel" for a in r1.actions)
+
+    # Build the carousel → cards with body + generated image are produced.
+    await convo.send(action=action("generate_wa_carousel"))
+    cards = convo.draft["whatsapp"]["cards"]
+    assert cards and all(c["body"] for c in cards)
+    assert cards[0]["media_url"].startswith("/api/uploads/")
+
+    # Pricing is per opened conversation (per-message), not CPM.
+    r2 = await convo.send("Бюджет 90000 рублей")
+    d = convo.draft
+    assert d["step"] == "confirmation"
+    assert d["cpm"] == 0.0
+    assert d["price_per_message"] == 9.0
+    assert d["cost"]["budget"] == 90000.0
+    assert any(a.id == "submit_campaign" for a in r2.actions)
+
+    # Submit → template goes to approval; nothing is sent / charged.
+    r3 = await convo.send(action=action("submit_campaign"))
+    assert convo.draft["status"] == "submitted"
+    assert convo.draft["whatsapp"]["template_status"] == "pending"
+    assert "согласован" in r3.assistant_message.lower()
+    saved = convo.store.campaigns[-1]
+    assert saved["draft"]["channel"] == "whatsapp"
+
+
+async def test_whatsapp_sender_selection(convo):
+    await convo.send("Собери кампанию в WhatsApp для кофейни")
+    await convo.send(action=action("select_wa_sender", sender_mode="dedicated"))
+    assert convo.draft["whatsapp"]["sender_mode"] == "dedicated"

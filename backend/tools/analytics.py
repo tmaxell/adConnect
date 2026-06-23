@@ -37,7 +37,7 @@ _AGE_WEIGHTS = (0.18, 0.32, 0.26, 0.14, 0.10)
 _DELTA_KEYS = ("spend", "impressions", "clicks", "ctr", "results", "cost_per_result")
 from tools.forecast import _PLATFORM_LABEL, _PLATFORM_WEIGHT
 
-_CHANNEL_LABEL = {"sms": "SMS", "email": "Email", "meta": "Meta"}
+_CHANNEL_LABEL = {"sms": "SMS", "email": "Email", "meta": "Meta", "whatsapp": "WhatsApp"}
 
 # Meta-style benchmarks used for the recommendations.
 _CTR_BENCHMARK = 1.15          # % — Facebook feed average
@@ -112,6 +112,8 @@ def campaign_metrics(campaign: dict) -> CampaignAnalytics:
     frequency = round(impressions / reach, 1)
 
     label, rate = _OBJECTIVE_RESULT.get(objective or "", ("Переходы", 0.9))
+    if channel == "whatsapp":
+        label = "Диалоги"          # WhatsApp result = opened conversations
     if objective == "awareness":
         results = reach
     elif objective == "engagement":

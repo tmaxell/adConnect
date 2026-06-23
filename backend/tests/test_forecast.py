@@ -103,3 +103,29 @@ def test_messaging_has_no_platform_breakdown():
     draft = CampaignDraft(channel="sms")
     apply_forecast(draft)
     assert draft.platform_breakdown == []
+
+
+# ── WhatsApp Business (operator broadcast via aggregator) ──────────────────────
+
+def test_whatsapp_applies_coverage_to_reach():
+    # WhatsApp reach = full base × coverage (subscribers on WhatsApp + opt-in).
+    f = estimate(CampaignDraft(channel="whatsapp"))
+    assert f.audience_reach == int(FULL_BASE_REACH * CHANNELS["whatsapp"].coverage)
+
+
+def test_whatsapp_priced_per_message_not_cpm():
+    draft = CampaignDraft(channel="whatsapp")
+    draft.cost.budget = 90_000
+    f = estimate(draft)
+    assert f.cpm == 0.0
+    assert f.price_per_message == CHANNELS["whatsapp"].base_price_per_message
+    # Messages (opened conversations) derive from the budget.
+    assert f.messages_count == int(90_000 // f.price_per_message)
+    assert f.estimated_cost <= 90_000
+
+
+def test_whatsapp_has_no_platform_breakdown():
+    from tools.forecast import apply_forecast
+    draft = CampaignDraft(channel="whatsapp")
+    apply_forecast(draft)
+    assert draft.platform_breakdown == []

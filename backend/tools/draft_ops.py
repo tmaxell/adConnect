@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from schemas import CampaignDraft
+from schemas import WA_MAX_CARDS, CampaignDraft, WhatsAppButton, WhatsAppCard
 from tools.brief import _canon_list_item
 
 _DEFAULT_MEDIA_FOR_FORMAT = {"feed": "image", "stories": "image", "reels": "video", "whatsapp": "image"}
@@ -56,7 +56,7 @@ def apply_patch(draft: CampaignDraft, patch: dict[str, Any]) -> CampaignDraft:
             setattr(draft, key, str(value).strip() if value else None)
         elif key == "brief_confirmed":
             draft.brief_confirmed = bool(value)
-        elif key == "channel" and value in ("sms", "email", "meta"):
+        elif key == "channel" and value in ("sms", "email", "meta", "whatsapp"):
             draft.channel = value  # type: ignore[assignment]
         elif key == "objective" and value in ("awareness", "traffic", "engagement", "leads", "sales"):
             meta.objective = value  # type: ignore[assignment]
@@ -139,5 +139,77 @@ def apply_patch(draft: CampaignDraft, patch: dict[str, Any]) -> CampaignDraft:
                 draft.cost.messages_count = int(value) if value not in (None, "") else None
             except (TypeError, ValueError):
                 pass
+        else:
+            _apply_whatsapp_patch(draft, key, value)
 
     return draft
+
+
+# ── WhatsApp Business creative / sender patches ─────────────────────────────────
+
+def _wa_card_at(wa, index: Any) -> WhatsAppCard | None:
+    try:
+        i = int(index)
+    except (TypeError, ValueError):
+        return None
+    return wa.cards[i] if 0 <= i < len(wa.cards) else None
+
+
+def _apply_whatsapp_patch(draft: CampaignDraft, key: str, value: Any) -> bool:
+    """Apply a WhatsApp Business patch (sender, carousel cards, auto-reply).
+
+    Returns True when the key was a WhatsApp key (handled), False otherwise.
+    """
+    wa = draft.whatsapp
+    if key == "wa_sender_mode" and value in ("shared", "dedicated"):
+        wa.sender_mode = value
+    elif key == "wa_sender_name":
+        wa.sender_name = str(value).strip() if value else None
+    elif key == "template_category" and value in ("marketing", "utility"):
+        wa.template_category = value
+    elif key == "wa_auto_reply_enabled":
+        wa.auto_reply_enabled = bool(value)
+    elif key == "toggle_wa_auto_reply":
+        wa.auto_reply_enabled = not wa.auto_reply_enabled
+    elif key == "wa_greeting":
+        wa.auto_reply_greeting = str(value) if value else None
+    elif key == "opt_in_source":
+        wa.opt_in_source = str(value) if value else None
+    elif key == "wa_add_card":
+        if len(wa.cards) < WA_MAX_CARDS:
+            wa.cards.append(WhatsAppCard())
+    elif key == "wa_remove_card":
+        card = _wa_card_at(wa, value)
+        if card is not None:
+            wa.cards.remove(card)
+    elif key == "wa_card_body" and isinstance(value, dict):
+        card = _wa_card_at(wa, value.get("index"))
+        if card is not None:
+            body = value.get("body")
+            card.body = str(body) if body else None
+    elif key == "wa_card_media" and isinstance(value, dict):
+        card = _wa_card_at(wa, value.get("index"))
+        if card is not None:
+            if value.get("media_type") in ("none", "image", "video"):
+                card.media_type = value["media_type"]
+            if "media_url" in value:
+                card.media_url = value.get("media_url")
+            if value.get("media_source") in ("upload", "generated", None):
+                card.media_source = value.get("media_source")
+    elif key == "wa_card_buttons" and isinstance(value, dict):
+        card = _wa_card_at(wa, value.get("index"))
+        if card is not None and isinstance(value.get("buttons"), list):
+            buttons: list[WhatsAppButton] = []
+            for b in value["buttons"][:2]:        # WhatsApp allows up to 2 buttons per card
+                if not isinstance(b, dict):
+                    continue
+                label = str(b.get("label") or "").strip()
+                if not label:
+                    continue
+                btype = b.get("type") if b.get("type") in ("quick_reply", "url") else "quick_reply"
+                bval = str(b["value"]) if b.get("value") else None
+                buttons.append(WhatsAppButton(type=btype, label=label, value=bval))
+            card.buttons = buttons
+    else:
+        return False
+    return True

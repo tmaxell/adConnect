@@ -26,6 +26,7 @@ class ChannelInfo:
     base_price_per_message: float = 0.0   # messaging: ₽ per message, before surcharges
     avg_cpm: float = 0.0                   # network: avg ₽ per 1000 impressions
     match_rate: float = 1.0                # network: Custom Audience match rate
+    coverage: float = 1.0                  # WhatsApp: share of the base with WhatsApp + opt-in
     min_audience: int = 0                  # network: minimum matched audience floor
     audience_landing: str = ""             # how an operator segment lands in the channel
     placements: tuple[str, ...] = ()
@@ -45,6 +46,17 @@ CHANNELS: dict[str, ChannelInfo] = {
         description="Promotional messages for ongoing customer engagement",
         kind="messaging",
         base_price_per_message=0.4,
+    ),
+    "whatsapp": ChannelInfo(
+        id="whatsapp",
+        label="WhatsApp Business",
+        description="Карусель-рассылка через бота под аккаунтом оператора (агрегатор)",
+        kind="messaging",
+        # Marketing template, per delivered message (~$0.10). Opening the chat is
+        # paid; the operator bot then continues the conversation for free (24h).
+        base_price_per_message=9.0,
+        coverage=0.7,                      # subscribers reachable on WhatsApp + opted in
+        audience_landing="WhatsApp opt-in (сопоставление через агрегатора)",
     ),
     "meta": ChannelInfo(
         id="meta",
@@ -66,9 +78,16 @@ def is_network_channel(channel: str | None) -> bool:
 
 
 def resolve_channel(text: str) -> str | None:
-    """Detect a channel mentioned in free text. Returns 'sms' | 'email' | 'meta' | None."""
+    """Detect a channel mentioned in free text. Returns 'sms' | 'email' | 'meta' | 'whatsapp' | None."""
     t = (text or "").lower()
-    if re.search(r"(meta|facebook|\bfb\b|instagram|insta|whats?app|мета|фейсбук|инстаграм|вотс?ап)", t):
+    # WhatsApp Business is a dedicated operator channel (carousel broadcast via the
+    # aggregator). A WhatsApp mention maps here UNLESS it sits in a Facebook /
+    # Instagram / Meta context (there WhatsApp is just a Meta placement / Click-to-WhatsApp).
+    meta_ctx = re.search(r"(meta|facebook|\bfb\b|instagram|insta|мета|фейсбук|инстаграм)", t)
+    whatsapp = re.search(r"(whats?app|вотс?ап|ватс?ап)", t)
+    if whatsapp and not meta_ctx:
+        return "whatsapp"
+    if meta_ctx or whatsapp:
         return "meta"
     if re.search(r"\b(e-?mail|почт|имейл|емейл)\w*", t):
         return "email"
