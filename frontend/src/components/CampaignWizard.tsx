@@ -555,6 +555,75 @@ function ChannelStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   );
 }
 
+// ── Extended operator (telecom) filters — shared by both audience variants ───────
+
+type SegKey = "tariff_type" | "arpu" | "device" | "data_usage" | "tenure"
+  | "marital_status" | "occupation" | "education";
+const OP_FILTERS: Array<{ key: SegKey; label: string; options: string[] }> = [
+  { key: "tariff_type", label: "Тип тарифа", options: ["Предоплата", "Постоплата", "Корпоративный"] },
+  { key: "arpu", label: "Средний чек (ARPU)", options: ["до 300 ₽", "300–700 ₽", "700–1500 ₽", "1500+ ₽"] },
+  { key: "device", label: "Устройство", options: ["iOS", "Android", "Премиум", "Бюджетные"] },
+  { key: "data_usage", label: "Потребление трафика", options: ["Низкое", "Среднее", "Высокое"] },
+  { key: "tenure", label: "Стаж с оператором", options: ["до 1 года", "1–3 года", "3+ года"] },
+  { key: "marital_status", label: "Семейное положение", options: ["Холост/не замужем", "В браке"] },
+  { key: "occupation", label: "Занятость", options: ["Наёмный", "Свой бизнес", "Студент", "Пенсионер"] },
+  { key: "education", label: "Образование", options: ["Среднее", "Высшее"] },
+];
+const TRIGGER_OPTIONS = ["Недавнее пополнение", "Окончание договора", "Смена устройства", "Всплеск трат", "Роуминг"];
+
+function SelectChips({ value, options, onPick, disabled }: {
+  value: string | null; options: string[]; onPick: (v: string | null) => void; disabled?: boolean;
+}) {
+  return (
+    <div className="acw-chips">
+      {options.map((o) => (
+        <button key={o} type="button" className={`acw-chip acw-chip-btn${value === o ? " acw-chip-accent" : " acw-chip-off"}`}
+          disabled={disabled} onClick={() => onPick(value === o ? null : o)}>{o}</button>
+      ))}
+    </div>
+  );
+}
+
+function OperatorExtraFilters({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
+  const s = draft.segments;
+  const activeCount =
+    OP_FILTERS.filter((f) => s[f.key]).length + (s.roaming ? 1 : 0) + (s.trigger_events.length ? 1 : 0);
+  const [open, setOpen] = useState(activeCount > 0);
+  return (
+    <div className="acw-extra">
+      <button type="button" className="acw-extra-head" onClick={() => setOpen((o) => !o)}>
+        <span>Доп. параметры аудитории{activeCount > 0 ? ` · ${activeCount}` : ""}</span>
+        <span className="acw-extra-caret">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div className="acw-extra-body">
+          {OP_FILTERS.map((f) => (
+            <Field key={f.key} label={f.label}>
+              <SelectChips value={s[f.key]} options={f.options} disabled={api.busy}
+                onPick={(v) => api.update({ [f.key]: v })} />
+            </Field>
+          ))}
+          <Field label="Триггеры (события)">
+            <div className="acw-chips">
+              {TRIGGER_OPTIONS.map((t) => {
+                const on = s.trigger_events.includes(t);
+                return (
+                  <button key={t} type="button" className={`acw-chip acw-chip-btn${on ? " acw-chip-accent" : " acw-chip-off"}`}
+                    disabled={api.busy} onClick={() => api.update({ toggle_trigger: t })}>{t}</button>
+                );
+              })}
+            </div>
+          </Field>
+          <div className="acw-toggle-row">
+            <span>Были в роуминге / поездках</span>
+            <Toggle on={s.roaming} onClick={() => api.update({ roaming: !s.roaming })} disabled={api.busy} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Audience step — Meta (network) ───────────────────────────────────────────────
 
 function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
@@ -667,6 +736,8 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
         />
       </Field>
 
+      <OperatorExtraFilters draft={draft} api={api} />
+
       {/* Placements — Advantage+ (auto) by default, switchable to manual. */}
       <Field label="Плейсменты">
         <div className="acw-toggle-row">
@@ -749,6 +820,8 @@ function OperatorSegmentsStep({ draft, api }: { draft: CampaignDraft; api: Wizar
         />
         <div className="acw-sub-field"><Chips items={s.children_age} empty="Возраст детей" /></div>
       </Field>
+
+      <OperatorExtraFilters draft={draft} api={api} />
     </>
   );
 }

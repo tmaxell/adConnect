@@ -76,8 +76,19 @@ def apply_patch(draft: CampaignDraft, patch: dict[str, Any]) -> CampaignDraft:
         elif key == "geography_remove":
             canon = _canon_list_item("geography", str(value))
             seg.geography = [g for g in seg.geography if g != canon]
-        elif key in ("monthly_income", "deposits_per_month"):
+        elif key in ("monthly_income", "deposits_per_month", "tariff_type", "arpu",
+                     "device", "data_usage", "tenure", "marital_status", "occupation", "education"):
             setattr(seg, key, str(value) if value else None)
+        elif key == "roaming":
+            seg.roaming = bool(value)
+        elif key == "trigger_events" and isinstance(value, list):
+            seg.trigger_events = [str(v) for v in value]
+        elif key == "toggle_trigger":
+            ev = str(value)
+            seg.trigger_events = (
+                [e for e in seg.trigger_events if e != ev] if ev in seg.trigger_events
+                else seg.trigger_events + [ev]
+            )
         elif key == "format" and value in ("feed", "stories", "reels", "whatsapp"):
             creative.format = value  # type: ignore[assignment]
             if creative.media_type == "none":

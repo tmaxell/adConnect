@@ -113,6 +113,25 @@ def test_advantage_mode_widens_reach():
     assert estimate(advantage).audience_reach > estimate(manual).audience_reach
 
 
+def test_extended_operator_filters():
+    from tools.forecast import estimate
+    d = CampaignDraft(channel="meta")
+    d.meta.audience_mode = "manual"
+    base = estimate(d).audience_reach
+    apply_patch(d, {"tariff_type": "Постоплата", "arpu": "700–1500 ₽", "device": "iOS",
+                    "data_usage": "Высокое", "tenure": "3+ года", "roaming": True,
+                    "marital_status": "В браке", "occupation": "Свой бизнес", "education": "Высшее"})
+    s = d.segments
+    assert s.tariff_type == "Постоплата" and s.device == "iOS" and s.roaming is True
+    assert s.is_specified()
+    assert estimate(d).audience_reach < base  # every filter narrows reach
+    # trigger toggles add/remove
+    apply_patch(d, {"toggle_trigger": "Смена устройства"})
+    assert "Смена устройства" in d.segments.trigger_events
+    apply_patch(d, {"toggle_trigger": "Смена устройства"})
+    assert "Смена устройства" not in d.segments.trigger_events
+
+
 def test_generate_svg_dimensions_and_escaping():
     svg = generate_svg(fmt="stories", media_type="video", headline="A & B <test>", brand="Бренд")
     assert svg.startswith("<svg")

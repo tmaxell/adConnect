@@ -44,6 +44,17 @@ _NARROWING = {
     "children_age": 0.55,
     "monthly_income": 0.60,
     "deposits_per_month": 0.60,
+    # Extended operator filters.
+    "tariff_type": 0.60,
+    "arpu": 0.60,
+    "device": 0.65,
+    "data_usage": 0.70,
+    "tenure": 0.70,
+    "roaming": 0.40,
+    "trigger_events": 0.50,
+    "marital_status": 0.65,
+    "occupation": 0.60,
+    "education": 0.75,
 }
 
 # Per-message surcharge (₽) for paid targeting dimensions (messaging channels).
@@ -103,6 +114,15 @@ def _narrow(reach: float, seg: SegmentSpec) -> float:
         reach *= _NARROWING["monthly_income"]
     if seg.deposits_per_month:
         reach *= _NARROWING["deposits_per_month"]
+    # Extended operator filters.
+    for attr in ("tariff_type", "arpu", "device", "data_usage", "tenure",
+                 "marital_status", "occupation", "education"):
+        if getattr(seg, attr):
+            reach *= _NARROWING[attr]
+    if seg.roaming:
+        reach *= _NARROWING["roaming"]
+    if seg.trigger_events:
+        reach *= _NARROWING["trigger_events"]
     return reach
 
 

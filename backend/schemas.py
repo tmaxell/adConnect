@@ -182,6 +182,17 @@ class SegmentSpec(BaseModel):
     interests: list[str] = Field(default_factory=list)
     children_age: list[str] = Field(default_factory=list)
     triggers_enabled: bool = False
+    # Extended operator (telecom big-data) filters — power the "Доп. параметры" block.
+    tariff_type: str | None = None          # предоплата / постоплата / корпоративный
+    arpu: str | None = None                 # средний чек (band)
+    device: str | None = None               # iOS / Android / премиум / бюджетные
+    data_usage: str | None = None           # низкое / среднее / высокое
+    tenure: str | None = None               # стаж с оператором (band)
+    roaming: bool = False                   # были в роуминге / поездках
+    trigger_events: list[str] = Field(default_factory=list)  # событийный таргетинг
+    marital_status: str | None = None
+    occupation: str | None = None
+    education: str | None = None
     matched_segment_id: str | None = None
     matched_segment_name: str | None = None
     # The user actively decided on the audience (picked a segment, described it on
@@ -200,6 +211,9 @@ class SegmentSpec(BaseModel):
             or self.monthly_income
             or self.deposits_per_month
             or self.demographics != "all"
+            or self.tariff_type or self.arpu or self.device or self.data_usage
+            or self.tenure or self.roaming or self.trigger_events
+            or self.marital_status or self.occupation or self.education
             or self.matched_segment_id
         )
 

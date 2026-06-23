@@ -766,3 +766,9 @@ button.ac-side-sub { appearance: none; -webkit-appearance: none; width: 100%; bo
 .prof-label { font-size: 13px; font-weight: 600; color: var(--ac-text-secondary); }
 .prof-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
 @media (max-width: 720px) { .prof-form { grid-template-columns: 1fr; } }
+
+/* Extended operator filters (collapsible) */
+.acw-extra { border: 1px solid var(--ac-border); border-radius: 10px; overflow: hidden; }
+.acw-extra-head { width: 100%; display: flex; align-items: center; justify-content: space-between; background: #f8fafc; border: 0; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600; color: var(--ac-text); padding: 12px 14px; }
+.acw-extra-caret { color: var(--ac-text-muted); font-size: 11px; }
+.acw-extra-body { display: flex; flex-direction: column; gap: 16px; padding: 14px; border-top: 1px solid var(--ac-border); }

@@ -35,6 +35,16 @@ export interface SegmentSpec {
   interests: string[];
   children_age: string[];
   triggers_enabled: boolean;
+  tariff_type: string | null;
+  arpu: string | null;
+  device: string | null;
+  data_usage: string | null;
+  tenure: string | null;
+  roaming: boolean;
+  trigger_events: string[];
+  marital_status: string | null;
+  occupation: string | null;
+  education: string | null;
   matched_segment_id: string | null;
   matched_segment_name: string | null;
   audience_confirmed: boolean;
