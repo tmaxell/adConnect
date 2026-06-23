@@ -11,6 +11,7 @@ import { listCampaigns, type CampaignSummary } from "../api/chatApi";
 import { useChatWorkspaceStore } from "../chat-workspace/store/chatWorkspaceStore";
 import { CampaignWizard } from "./CampaignWizard";
 import { AnalyticsPage } from "./AnalyticsPage";
+import { ProfilePage } from "./ProfilePage";
 import { LogoFull } from "./Logo";
 
 const USER_EMAIL = "ivani_gp@starcorp.com";
@@ -236,7 +237,13 @@ function AdcSidebar() {
           </span>
           <Chevron dir="down" />
         </div>
-        <div className="ac-side-sub">Profile</div>
+        <button
+          type="button"
+          className={`ac-side-sub${view === "profile" ? " ac-side-sub-active" : ""}`}
+          onClick={() => setView("profile")}
+        >
+          Profile
+        </button>
         <div className="ac-side-sub">Names of Senders</div>
         <div className="ac-side-sub">Users</div>
         <div className="ac-side-item ac-side-lang">
@@ -376,6 +383,8 @@ export function AdConnectMock() {
         <main className="ac-main">
           {view === "analytics"
             ? <AnalyticsPage />
+            : view === "profile"
+            ? <ProfilePage />
             : campaignDraft ? <CampaignWizard draft={campaignDraft} /> : <AdcCampaignsScreen />}
         </main>
       </div>

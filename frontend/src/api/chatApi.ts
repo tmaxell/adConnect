@@ -3,7 +3,7 @@
  * Все взаимодействия с агентами идут через POST /api/chat (intent routing на бэкенде).
  */
 
-import type { CampaignDraft } from "../types/campaign";
+import type { BusinessProfile, CampaignDraft } from "../types/campaign";
 import type { AnalyticsSummary, CampaignAdvice, CampaignAnalytics } from "../types/analytics";
 
 export interface ChatSession {
@@ -388,4 +388,14 @@ export async function getCampaignAnalytics(campaignId: number): Promise<Campaign
 
 export async function getCampaignAdvice(campaignId: number): Promise<CampaignAdvice> {
   return http<CampaignAdvice>(`/api/analytics/${campaignId}/advice`, { method: "POST" });
+}
+
+// ── Business profile ──────────────────────────────────────────────────────────
+
+export async function getProfile(): Promise<BusinessProfile> {
+  return http<BusinessProfile>("/api/profile");
+}
+
+export async function putProfile(profile: Partial<BusinessProfile>): Promise<BusinessProfile> {
+  return http<BusinessProfile>("/api/profile", { method: "PUT", body: JSON.stringify(profile) });
 }

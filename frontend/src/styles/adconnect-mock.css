@@ -749,3 +749,20 @@ button.ac-side-item {
 @media (max-width: 760px) {
   .ana-demo { grid-template-columns: 1fr; gap: 16px; }
 }
+
+/* Brief step */
+.acw-brief-intro { font-size: 13px; color: var(--ac-text-secondary); background: var(--ac-accent-soft); border-radius: 8px; padding: 10px 12px; }
+.acw-objective-pill { font-size: 13px; color: var(--ac-text-secondary); }
+.acw-objective-pill b { color: var(--ac-text); }
+
+/* Sidebar Profile sub-item as a button */
+button.ac-side-sub { appearance: none; -webkit-appearance: none; width: 100%; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+.ac-side-sub.ac-side-sub-active { color: var(--ac-accent); font-weight: 600; }
+
+/* Business profile form */
+.prof-form { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.prof-field { display: flex; flex-direction: column; gap: 6px; }
+.prof-field-wide { grid-column: 1 / -1; }
+.prof-label { font-size: 13px; font-weight: 600; color: var(--ac-text-secondary); }
+.prof-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
+@media (max-width: 720px) { .prof-form { grid-template-columns: 1fr; } }

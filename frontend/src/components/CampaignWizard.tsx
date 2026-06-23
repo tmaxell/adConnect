@@ -24,6 +24,8 @@ import {
 } from "../types/campaign";
 import { NETWORK_CHANNELS, OPERATOR_CHANNELS, type ChannelCard } from "./channels";
 import { useChatWorkspaceStore } from "../chat-workspace/store/chatWorkspaceStore";
+import { getProfile } from "../api/chatApi";
+import type { BusinessProfile } from "../types/campaign";
 
 const CHANNEL_LABEL: Record<string, string> = { sms: "SMS", email: "Email", meta: "Meta" };
 function channelLabel(c: string | null): string {
@@ -170,11 +172,12 @@ function PlatformIcon({ platform }: { platform: string }) {
 }
 
 const STEP_ORDER: Array<Exclude<WizardStep, "ready">> = [
-  "channel", "segments", "message", "cost", "confirmation",
+  "brief", "channel", "segments", "message", "cost", "confirmation",
 ];
 
 function stepLabel(step: Exclude<WizardStep, "ready">, network: boolean): string {
   switch (step) {
+    case "brief": return "Бриф";
     case "channel": return "Канал";
     case "segments": return network ? "Аудитория" : "Сегменты";
     case "message": return network ? "Креатив" : "Сообщение";
@@ -480,6 +483,59 @@ function ChannelCardButton({ card, selected, api }: { card: ChannelCard; selecte
   );
 }
 
+// ── Brief step — what's advertised + objective (first step) ──────────────────────
+
+function ObjectiveCards({ value, onPick, disabled }: { value: string; onPick: (o: string) => void; disabled?: boolean }) {
+  return (
+    <div className="acw-obj-grid">
+      {ALL_OBJECTIVES.map((o) => (
+        <button key={o} type="button" className={`acw-obj${value === o ? " on" : ""}`} disabled={disabled} onClick={() => onPick(o)}>
+          <ObjectiveIcon objective={o} />
+          <span className="acw-obj-text">
+            <span className="acw-obj-label">{OBJECTIVE_LABEL[o]}</span>
+            <span className="acw-obj-desc">{OBJECTIVE_DESC[o]}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function BriefStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
+  const [profile, setProfile] = useState<BusinessProfile | null>(null);
+  useEffect(() => { getProfile().then(setProfile).catch(() => {}); }, []);
+  // Pre-fill company from the profile once (only if the brief is still empty).
+  useEffect(() => {
+    if (profile?.company_name && !draft.company) api.update({ company: profile.company_name });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile]);
+  return (
+    <>
+      <div className="acw-brief-intro">
+        Опишите, что продвигаем и зачем — AdConnect Copilot использует это для подбора аудитории и генерации офферов и креативов.
+      </div>
+      <Field label="Что рекламируем" hint="Продукт или услуга — например: «фитнес-клуб», «доставка готовой еды».">
+        <EditableText value={draft.product} placeholder={profile?.default_product || "Продукт или услуга"}
+          onCommit={(v) => api.update({ product: v })} disabled={api.busy} />
+      </Field>
+      <Field label="Компания / бренд">
+        <EditableText value={draft.company} placeholder={profile?.company_name || "Название компании"}
+          onCommit={(v) => api.update({ company: v })} disabled={api.busy} />
+      </Field>
+      <Field label="Оффер (необязательно)" hint="Спецпредложение этой кампании — например: «первый месяц бесплатно», «скидка 20%».">
+        <EditableText value={draft.offer} placeholder="Скидка, бонус, акция…"
+          onCommit={(v) => api.update({ offer: v })} disabled={api.busy} />
+      </Field>
+      <Field label="Цель кампании" hint="Определяет, под что Copilot оптимизирует подбор и креативы.">
+        <ObjectiveCards value={draft.meta.objective} onPick={(o) => api.update({ objective: o })} disabled={api.busy} />
+      </Field>
+      {!profile?.company_name && (
+        <div className="acw-hint">Заполните «Профиль компании», чтобы не вводить компанию и тон каждый раз.</div>
+      )}
+    </>
+  );
+}
+
 function ChannelStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   return (
     <>
@@ -514,26 +570,10 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
         Рекламный аккаунт ведётся через кабинет оператора (Business Manager) — подключать свой не нужно.
       </div>
 
-      {/* Campaign objective — ODAX cards. */}
-      <Field label="Цель кампании">
-        <div className="acw-obj-grid">
-          {ALL_OBJECTIVES.map((o) => (
-            <button
-              key={o}
-              type="button"
-              className={`acw-obj${m.objective === o ? " on" : ""}`}
-              disabled={api.busy}
-              onClick={() => api.update({ objective: o })}
-            >
-              <ObjectiveIcon objective={o} />
-              <span className="acw-obj-text">
-                <span className="acw-obj-label">{OBJECTIVE_LABEL[o]}</span>
-                <span className="acw-obj-desc">{OBJECTIVE_DESC[o]}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-      </Field>
+      {/* Objective is set on the Brief step; show it here as read-only context. */}
+      <div className="acw-objective-pill">
+        Цель: <b>{OBJECTIVE_LABEL[m.objective] ?? m.objective}</b>
+      </div>
 
       {/* Audience-building method — Advantage+ vs manual (Meta's two top modes). */}
       <Field label="Метод подбора аудитории">
@@ -1071,6 +1111,7 @@ export function CampaignWizard({ draft }: { draft: CampaignDraft }) {
   const isLast = step === "confirmation";
 
   const content = {
+    brief: <BriefStep draft={draft} api={api} />,
     channel: <ChannelStep draft={draft} api={api} />,
     segments: <SegmentsStep draft={draft} api={api} />,
     message: <MessageStep draft={draft} api={api} />,
@@ -1078,6 +1119,12 @@ export function CampaignWizard({ draft }: { draft: CampaignDraft }) {
     confirmation: <ConfirmationStep draft={draft} />,
   }[step];
 
+  // On the brief step, "Продолжить" requires a product and confirms the brief.
+  const briefBlocked = step === "brief" && !(draft.product && draft.product.trim());
+  const onContinue = () => {
+    if (step === "brief" && !draft.brief_confirmed) updateDraft({ brief_confirmed: true });
+    setViewStep(STEP_ORDER[idx + 1]);
+  };
   const submit = () => void sendMessage("", { id: "submit_campaign", label: "Отправить на модерацию", kind: "primary", payload: {} });
 
   return (
@@ -1113,8 +1160,9 @@ export function CampaignWizard({ draft }: { draft: CampaignDraft }) {
           <button
             className="acw-btn acw-btn-primary"
             type="button"
-            disabled={sending}
-            onClick={() => setViewStep(STEP_ORDER[idx + 1])}
+            disabled={sending || briefBlocked}
+            title={briefBlocked ? "Укажите, что рекламируем" : undefined}
+            onClick={onContinue}
           >
             Продолжить
           </button>

@@ -4,8 +4,17 @@
  * canvas renders live.
  */
 
-export type WizardStep = "channel" | "segments" | "message" | "cost" | "confirmation" | "ready";
-export const WIZARD_STEPS: WizardStep[] = ["channel", "segments", "message", "cost", "confirmation"];
+export type WizardStep = "brief" | "channel" | "segments" | "message" | "cost" | "confirmation" | "ready";
+export const WIZARD_STEPS: WizardStep[] = ["brief", "channel", "segments", "message", "cost", "confirmation"];
+
+export interface BusinessProfile {
+  company_name: string | null;
+  industry: string | null;
+  website: string | null;
+  tone: string | null;
+  default_product: string | null;
+  description: string | null;
+}
 
 export type Channel = "sms" | "email" | "meta";
 export type Demographics = "all" | "men" | "women";
@@ -87,6 +96,9 @@ export interface CampaignDraft {
   name: string | null;
   goal: string | null;
   product: string | null;
+  company: string | null;
+  offer: string | null;
+  brief_confirmed: boolean;
   channel: Channel | null;
   segments: SegmentSpec;
   message: MessageSpec;
