@@ -24,7 +24,7 @@ import {
 } from "../types/campaign";
 import { NETWORK_CHANNELS, OPERATOR_CHANNELS, type ChannelCard } from "./channels";
 import { useChatWorkspaceStore } from "../chat-workspace/store/chatWorkspaceStore";
-import { getProfile } from "../api/chatApi";
+import { getAudiences, getProfile, saveAudience, type AudienceItem } from "../api/chatApi";
 import type { BusinessProfile } from "../types/campaign";
 
 const CHANNEL_LABEL: Record<string, string> = { sms: "SMS", email: "Email", meta: "Meta" };
@@ -555,6 +555,68 @@ function ChannelStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   );
 }
 
+// ── Saved-audience picker — reuse a previously built / preset audience ───────────
+
+function AudiencePicker({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
+  const [lib, setLib] = useState<{ saved: AudienceItem[]; presets: AudienceItem[] } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const reload = () => getAudiences().then(setLib).catch(() => {});
+  useEffect(() => { reload(); }, []);
+
+  const apply = (item: AudienceItem, isPreset: boolean) =>
+    api.update({
+      apply_segment_spec: item.spec,
+      matched_segment_name: item.name,
+      ...(isPreset ? { matched_segment_id: String(item.id) } : {}),
+    });
+
+  const save = async () => {
+    const name = window.prompt("Название аудитории:", draft.product ? `Аудитория «${draft.product}»` : "Моя аудитория");
+    if (!name) return;
+    setSaving(true);
+    try {
+      await saveAudience({
+        name, channel: draft.channel, reach: draft.audience_reach,
+        spec: draft.segments as unknown as Record<string, unknown>,
+      });
+      await reload();
+    } finally { setSaving(false); }
+  };
+
+  const active = draft.segments.matched_segment_name;
+  return (
+    <Field label="Готовая аудитория" hint="Выберите ранее сохранённую или готовый сегмент оператора — параметры подставятся автоматически.">
+      {lib && lib.saved.length > 0 && (
+        <>
+          <div className="acw-aud-group">Мои сохранённые</div>
+          <div className="acw-chips">
+            {lib.saved.map((a) => (
+              <button key={`s${a.id}`} type="button"
+                className={`acw-chip acw-chip-btn${active === a.name ? " acw-chip-accent" : " acw-chip-off"}`}
+                disabled={api.busy} onClick={() => apply(a, false)}>
+                {a.name} · {fmt(a.reach)}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <div className="acw-aud-group">Готовые сегменты оператора</div>
+      <div className="acw-chips">
+        {(lib?.presets ?? []).map((a) => (
+          <button key={`p${a.id}`} type="button"
+            className={`acw-chip acw-chip-btn${active === a.name ? " acw-chip-accent" : " acw-chip-off"}`}
+            disabled={api.busy} onClick={() => apply(a, true)} title={a.description}>
+            {a.name} · {fmt(a.reach)}
+          </button>
+        ))}
+      </div>
+      <button type="button" className="acw-btn acw-btn-ghost acw-aud-save" disabled={api.busy || saving} onClick={save}>
+        {saving ? "Сохраняю…" : "＋ Сохранить текущую аудиторию"}
+      </button>
+    </Field>
+  );
+}
+
 // ── Extended operator (telecom) filters — shared by both audience variants ───────
 
 type SegKey = "tariff_type" | "arpu" | "device" | "data_usage" | "tenure"
@@ -643,6 +705,8 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
       <div className="acw-objective-pill">
         Цель: <b>{OBJECTIVE_LABEL[m.objective] ?? m.objective}</b>
       </div>
+
+      <AudiencePicker draft={draft} api={api} />
 
       {/* Audience-building method — Advantage+ vs manual (Meta's two top modes). */}
       <Field label="Метод подбора аудитории">
@@ -777,6 +841,7 @@ function OperatorSegmentsStep({ draft, api }: { draft: CampaignDraft; api: Wizar
   const s = draft.segments;
   return (
     <>
+      <AudiencePicker draft={draft} api={api} />
       {s.matched_segment_name && (
         <Field label="Сегмент абонентской базы">
           <div className="acw-chips"><span className="acw-chip acw-chip-accent">{s.matched_segment_name}</span></div>

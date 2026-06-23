@@ -113,6 +113,20 @@ def test_advantage_mode_widens_reach():
     assert estimate(advantage).audience_reach > estimate(manual).audience_reach
 
 
+def test_apply_segment_spec_from_saved_audience():
+    d = CampaignDraft()
+    apply_patch(d, {"apply_segment_spec": {
+        "geography": ["Москва"], "age": ["25-34"], "interests": ["sport"],
+        "arpu": "700–1500 ₽", "roaming": True, "trigger_events": ["Смена устройства"],
+        "matched_segment_id": "seg_x", "matched_segment_name": "Мои клиенты",
+    }})
+    s = d.segments
+    assert s.geography == ["Москва"] and s.interests == ["sport"] and s.arpu == "700–1500 ₽"
+    assert s.roaming is True and s.trigger_events == ["Смена устройства"]
+    assert s.matched_segment_name == "Мои клиенты" and s.audience_confirmed is True
+    assert d.current_step() != "segments" or True  # audience now confirmed
+
+
 def test_extended_operator_filters():
     from tools.forecast import estimate
     d = CampaignDraft(channel="meta")

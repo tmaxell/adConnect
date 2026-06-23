@@ -772,3 +772,7 @@ button.ac-side-sub { appearance: none; -webkit-appearance: none; width: 100%; bo
 .acw-extra-head { width: 100%; display: flex; align-items: center; justify-content: space-between; background: #f8fafc; border: 0; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600; color: var(--ac-text); padding: 12px 14px; }
 .acw-extra-caret { color: var(--ac-text-muted); font-size: 11px; }
 .acw-extra-body { display: flex; flex-direction: column; gap: 16px; padding: 14px; border-top: 1px solid var(--ac-border); }
+
+/* Saved-audience picker */
+.acw-aud-group { font-size: 12px; font-weight: 600; color: var(--ac-text-secondary); margin-top: 8px; margin-bottom: 4px; }
+.acw-aud-save { margin-top: 12px; align-self: flex-start; }

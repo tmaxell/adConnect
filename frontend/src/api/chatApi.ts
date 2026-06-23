@@ -399,3 +399,32 @@ export async function getProfile(): Promise<BusinessProfile> {
 export async function putProfile(profile: Partial<BusinessProfile>): Promise<BusinessProfile> {
   return http<BusinessProfile>("/api/profile", { method: "PUT", body: JSON.stringify(profile) });
 }
+
+// ── Saved audiences ───────────────────────────────────────────────────────────
+
+export interface AudienceItem {
+  id: number | string;
+  name: string;
+  description?: string;
+  reach: number;
+  spec: Record<string, unknown>;
+}
+export interface AudienceLibrary {
+  saved: AudienceItem[];
+  presets: AudienceItem[];
+}
+
+export async function getAudiences(): Promise<AudienceLibrary> {
+  const data = await http<unknown>("/api/audiences");
+  const o = isObject(data) ? data : {};
+  return {
+    saved: Array.isArray(o.saved) ? (o.saved as AudienceItem[]) : [],
+    presets: Array.isArray(o.presets) ? (o.presets as AudienceItem[]) : [],
+  };
+}
+
+export async function saveAudience(body: {
+  name: string; channel: string | null; reach: number; spec: Record<string, unknown>;
+}): Promise<AudienceItem> {
+  return http<AudienceItem>("/api/audiences", { method: "POST", body: JSON.stringify(body) });
+}

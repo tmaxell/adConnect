@@ -34,7 +34,7 @@ from agents.base import AgentContext
 from agents.supervisor import handle as supervisor_handle
 from db import ChatStore, init_db
 from schemas import CampaignDraft, ChatAction, ChatArtifact, ChatTraceEvent
-from tools import analytics, creative_gen, creatives as creatives_tool, naming
+from tools import analytics, catalog, creative_gen, creatives as creatives_tool, naming
 from tools.draft_ops import apply_patch
 from tools.forecast import apply_forecast
 
@@ -144,6 +144,34 @@ async def put_profile(profile: dict[str, Any]):
     allowed = {"company_name", "industry", "website", "tone", "default_product", "description"}
     data = {k: v for k, v in (profile or {}).items() if k in allowed}
     return await store.save_profile(data)
+
+
+# ── Saved audiences ───────────────────────────────────────────────────────────
+
+@app.get("/api/audiences")
+async def list_audiences():
+    """Reusable audiences: the user's saved ones + ready operator presets."""
+    saved = await store.list_saved_audiences()
+    presets = [
+        {"id": s.id, "name": s.name, "description": s.description, "reach": s.reach,
+         "spec": {**s.spec, "matched_segment_id": s.id, "matched_segment_name": s.name}}
+        for s in catalog.SEGMENTS
+    ]
+    return {"saved": saved, "presets": presets}
+
+
+class SaveAudienceRequest(BaseModel):
+    name: str
+    channel: str | None = None
+    reach: int = 0
+    spec: dict[str, Any] = Field(default_factory=dict)
+
+
+@app.post("/api/audiences")
+async def save_audience(request: SaveAudienceRequest):
+    name = (request.name or "").strip() or "Аудитория"
+    return await store.save_audience(name=name, channel=request.channel,
+                                     reach=request.reach, spec=request.spec)
 
 
 # ── Analytics ─────────────────────────────────────────────────────────────────

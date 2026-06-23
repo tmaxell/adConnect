@@ -26,6 +26,25 @@ def _set_list(key: str, value: Any) -> list[str]:
     return out
 
 
+_SPEC_LIST_FIELDS = ("geography", "age", "interests", "children_age", "trigger_events")
+_SPEC_STR_FIELDS = ("demographics", "monthly_income", "deposits_per_month", "tariff_type", "arpu",
+                    "device", "data_usage", "tenure", "marital_status", "occupation", "education",
+                    "matched_segment_id", "matched_segment_name")
+
+
+def _apply_segment_spec(seg, spec: dict[str, Any]) -> None:
+    """Apply a saved audience / operator preset spec onto the draft's segments."""
+    for f in _SPEC_LIST_FIELDS:
+        if isinstance(spec.get(f), list):
+            setattr(seg, f, [str(x) for x in spec[f]])
+    for f in _SPEC_STR_FIELDS:
+        if spec.get(f) is not None:
+            setattr(seg, f, str(spec[f]) or None)
+    if "roaming" in spec:
+        seg.roaming = bool(spec["roaming"])
+    seg.audience_confirmed = True
+
+
 def apply_patch(draft: CampaignDraft, patch: dict[str, Any]) -> CampaignDraft:
     """Mutate the draft in place from a flat patch dict. Unknown keys are ignored."""
     seg = draft.segments
@@ -57,6 +76,10 @@ def apply_patch(draft: CampaignDraft, patch: dict[str, Any]) -> CampaignDraft:
             seg.demographics = value  # type: ignore[assignment]
         elif key == "audience_confirmed":
             seg.audience_confirmed = bool(value)
+        elif key == "apply_segment_spec" and isinstance(value, dict):
+            _apply_segment_spec(seg, value)
+        elif key in ("matched_segment_id", "matched_segment_name"):
+            setattr(seg, key, str(value) if value else None)
         elif key == "toggle_placement":
             pid = str(value)
             if pid in meta.placements:
