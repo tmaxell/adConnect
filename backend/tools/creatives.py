@@ -17,31 +17,45 @@ logger = logging.getLogger(__name__)
 _SMS_MAX = 160
 
 
-def _fallback_variants(product: str, goal: str, channel: str) -> list[str]:
+def _fallback_variants(product: str, goal: str, channel: str, offer: str | None = None) -> list[str]:
     """Deterministic, advertiser-neutral copy used when no LLM is available."""
     subject = (product or "").strip() or "наше предложение"
     subject = subject[:1].upper() + subject[1:]
+    deal = (offer or "").strip()
+    promo = f" {deal}." if deal else " специальное предложение."
     if channel == "email":
         return [
-            f"{subject}: специальное предложение. Подробности и условия — по ссылке в письме.",
-            f"Только для вас: {subject}. Оставьте заявку сегодня и получите бонус.",
-            f"Не пропустите {subject}. Ограниченная акция — успейте до конца недели.",
+            f"{subject}:{promo} Подробности и условия — по ссылке в письме.",
+            f"Только для вас: {subject}.{promo} Оставьте заявку сегодня.",
+            f"Не пропустите {subject}.{promo} Успейте до конца недели.",
         ]
     return [
-        f"{subject}: специальное предложение, успейте воспользоваться. Подробности по ссылке.",
-        f"{subject} со скидкой! Оставьте заявку сегодня и получите бонус.",
-        f"Не пропустите {subject}. Ограниченное предложение — переходите по ссылке.",
+        f"{subject}:{promo} Подробности по ссылке.",
+        f"{subject} —{promo} Оставьте заявку сегодня.",
+        f"Не пропустите {subject}.{promo} Переходите по ссылке.",
     ]
 
 
-_LLM_SYSTEM = """You are a copywriter for the AdConnect advertising platform.
-Write {n} short advertising message variants in Russian for the given product, goal, channel and audience.
+_LLM_SYSTEM = """You are a senior copywriter for the AdConnect advertising platform.
+Write {n} short advertising message variants in Russian using the campaign brief below.
+Each variant should follow hook → offer/benefit → call to action, and the variants
+must take DIFFERENT angles (e.g. discount, social proof, urgency, the main benefit).
+Tailor wording to the audience and the campaign objective.
 Rules:
 - SMS: each variant <= 160 characters, punchy, one call to action.
 - Email: each variant is a single subject-style line, slightly longer is fine.
 - Meta (Facebook/Instagram/WhatsApp): 1-2 short sentences of primary ad text with a clear call to action.
+- If an offer is given, make it concrete and prominent. Mention the brand naturally when provided.
 - No emojis, no placeholders, no markdown. Each variant must stand alone.
 {tone_line}Return STRICT JSON: {{"variants": ["...", "...", "..."]}}"""
+
+_OBJECTIVE_HINT = {
+    "awareness": "Цель — узнаваемость: запоминающийся образ бренда.",
+    "traffic": "Цель — трафик: мотивировать перейти по ссылке.",
+    "engagement": "Цель — вовлечённость: побудить написать/отреагировать.",
+    "leads": "Цель — лиды: побудить оставить заявку/контакт.",
+    "sales": "Цель — продажи: подтолкнуть к покупке.",
+}
 
 # Tone presets steer the copy without changing the structure.
 _TONE_HINT = {
@@ -55,7 +69,8 @@ _TONE_HINT = {
 
 
 async def _llm_variants(
-    product: str, goal: str, channel: str, audience: str, n: int, tone: str | None = None
+    product: str, goal: str, channel: str, audience: str, n: int, tone: str | None = None,
+    company: str | None = None, offer: str | None = None, objective: str | None = None,
 ) -> list[str]:
     try:
         from langchain_core.messages import HumanMessage, SystemMessage
@@ -63,10 +78,15 @@ async def _llm_variants(
         from llm import get_llm
 
         llm = get_llm(temperature=0.7)
-        tone_line = (_TONE_HINT.get(tone or "", "") + "\n") if tone else ""
+        hints = _TONE_HINT.get(tone or "", "")
+        if objective and objective in _OBJECTIVE_HINT:
+            hints = (hints + " " + _OBJECTIVE_HINT[objective]).strip()
+        tone_line = (hints + "\n") if hints else ""
         prompt = (
-            f"Product: {product or '—'}\n"
-            f"Goal: {goal or '—'}\n"
+            f"Product/service: {product or '—'}\n"
+            f"Company/brand: {company or '—'}\n"
+            f"Offer: {offer or '—'}\n"
+            f"Goal (in user words): {goal or '—'}\n"
             f"Channel: {channel}\n"
             f"Audience: {audience or '—'}"
         )
@@ -106,6 +126,9 @@ async def generate_creatives(
     goal: str | None,
     channel: str,
     audience: str | None = None,
+    company: str | None = None,
+    offer: str | None = None,
+    objective: str | None = None,
     n: int = 3,
     tone: str | None = None,
     use_llm: bool = True,
@@ -115,9 +138,10 @@ async def generate_creatives(
     goal = goal or ""
     variants: list[str] = []
     if use_llm:
-        variants = await _llm_variants(product, goal, channel, audience or "", n, tone)
+        variants = await _llm_variants(product, goal, channel, audience or "", n, tone,
+                                       company=company, offer=offer, objective=objective)
     if not variants:
-        variants = _fallback_variants(product, goal, channel)[:n]
+        variants = _fallback_variants(product, goal, channel, offer)[:n]
     if channel == "sms":
         variants = [v if len(v) <= _SMS_MAX else v[: _SMS_MAX - 1].rstrip() + "…" for v in variants]
     return variants

@@ -34,7 +34,7 @@ from agents.base import AgentContext
 from agents.supervisor import handle as supervisor_handle
 from db import ChatStore, init_db
 from schemas import CampaignDraft, ChatAction, ChatArtifact, ChatTraceEvent
-from tools import analytics, catalog, creative_gen, creatives as creatives_tool, naming
+from tools import analytics, catalog, context, creative_gen, creatives as creatives_tool, naming
 from tools.draft_ops import apply_patch
 from tools.forecast import apply_forecast
 
@@ -311,10 +311,15 @@ async def generate_copy(session_id: str, request: CopyGenerateRequest):
         raise HTTPException(status_code=404, detail="Session not found")
     draft = await _load_latest_draft(session_id)
     brief = (request.brief or "").strip() or None
-    audience = draft.segments.matched_segment_name or ", ".join(draft.segments.interests)
+    profile = await store.get_profile()
+    audience = context.audience_description_from_draft(draft) or \
+        (draft.segments.matched_segment_name or ", ".join(draft.segments.interests))
     variants = await creatives_tool.generate_creatives(
-        product=brief or draft.product, goal=draft.goal, channel=draft.channel or "meta",
-        audience=audience, n=max(1, min(5, request.n)), tone=request.tone,
+        product=brief or draft.product or profile.get("default_product"),
+        goal=draft.goal, channel=draft.channel or "meta", audience=audience,
+        company=draft.company or profile.get("company_name"), offer=draft.offer,
+        objective=draft.meta.objective, tone=request.tone or profile.get("tone"),
+        n=max(1, min(5, request.n)),
     )
     draft.message.variants = variants
     if brief and not draft.product:

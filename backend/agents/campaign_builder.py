@@ -27,6 +27,7 @@ from typing import Any
 
 from agents.base import AgentContext, AgentResult
 from schemas import META_PLACEMENTS, CampaignDraft, ChatAction
+from tools import context
 from tools import creative_gen
 from tools import creatives as creatives_tool
 from tools import naming
@@ -236,13 +237,31 @@ async def _suggest_audience(ctx: AgentContext, draft: CampaignDraft) -> AgentRes
     return _wrap(draft, "\n".join(lines), actions, substep="audience")
 
 
+async def _copy_context(ctx: AgentContext, draft: CampaignDraft) -> dict[str, Any]:
+    """Full brief for creative generation: product, company, offer, objective, audience."""
+    profile: dict[str, Any] = {}
+    if hasattr(ctx.store, "get_profile"):
+        try:
+            profile = await ctx.store.get_profile()
+        except Exception:  # pragma: no cover - defensive
+            profile = {}
+    audience = context.audience_description_from_draft(draft) or \
+        (draft.segments.matched_segment_name or ", ".join(draft.segments.interests))
+    return {
+        "product": naming.clean_subject(draft.product, draft.goal) or profile.get("default_product"),
+        "goal": draft.goal,
+        "channel": draft.channel or "sms",
+        "audience": audience,
+        "company": draft.company or profile.get("company_name"),
+        "offer": draft.offer,
+        "objective": draft.meta.objective,
+        "tone": profile.get("tone"),
+    }
+
+
 async def _generate_creatives(ctx: AgentContext, draft: CampaignDraft) -> AgentResult:
     channel = draft.channel or "sms"
-    audience = draft.segments.matched_segment_name or ", ".join(draft.segments.interests)
-    subject = naming.clean_subject(draft.product, draft.goal)
-    variants = await creatives_tool.generate_creatives(
-        product=subject, goal=draft.goal, channel=channel, audience=audience,
-    )
+    variants = await creatives_tool.generate_creatives(**await _copy_context(ctx, draft))
     draft.message.variants = variants
     await ctx.emit("tool_called", detail=f"generate_creatives → {len(variants)} variant(s)")
 
@@ -265,11 +284,7 @@ async def _ensure_ad_text(ctx: AgentContext, draft: CampaignDraft) -> str:
     if draft.message.text:
         return draft.message.text
     if not draft.message.variants:
-        subject = naming.clean_subject(draft.product, draft.goal)
-        draft.message.variants = await creatives_tool.generate_creatives(
-            product=subject, goal=draft.goal, channel="meta",
-            audience=draft.segments.matched_segment_name or ", ".join(draft.segments.interests),
-        )
+        draft.message.variants = await creatives_tool.generate_creatives(**await _copy_context(ctx, draft))
     draft.message.text = draft.message.variants[0] if draft.message.variants else \
         "Специальное предложение — подробности по ссылке."
     return draft.message.text
