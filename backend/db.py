@@ -21,11 +21,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from models import (
     Base,
+    BusinessProfileModel,
     CampaignModel,
     ChatMessageModel,
     ChatRunEventModel,
     ChatRunModel,
     ChatSessionModel,
+    SavedAudienceModel,
     SavedArtifactModel,
 )
 from schemas import ChatTraceEvent
@@ -374,6 +376,49 @@ class ChatStore:
             if c is None:
                 return None
             return {**self._campaign_dict(c), "draft": c.draft_json or {}}
+
+    # ── Business profile (single row) ─────────────────────────────────────────
+
+    async def get_profile(self) -> dict[str, Any]:
+        async with session_scope() as db:
+            row = await db.get(BusinessProfileModel, 1)
+            return dict(row.data_json or {}) if row else {}
+
+    async def save_profile(self, data: dict[str, Any]) -> dict[str, Any]:
+        async with session_scope() as db:
+            row = await db.get(BusinessProfileModel, 1)
+            if row is None:
+                row = BusinessProfileModel(id=1, data_json=data)
+                db.add(row)
+            else:
+                row.data_json = data
+            await db.flush()
+            return dict(row.data_json or {})
+
+    # ── Saved audiences ───────────────────────────────────────────────────────
+
+    async def list_saved_audiences(self) -> list[dict[str, Any]]:
+        async with session_scope() as db:
+            rows = await db.scalars(select(SavedAudienceModel).order_by(SavedAudienceModel.created_at.desc()))
+            return [self._audience_dict(a) for a in rows]
+
+    async def save_audience(self, *, name: str, channel: str | None, reach: int,
+                            spec: dict[str, Any]) -> dict[str, Any]:
+        async with session_scope() as db:
+            row = SavedAudienceModel(name=name, channel=channel, reach=int(reach or 0), spec_json=spec)
+            db.add(row)
+            await db.flush()
+            return self._audience_dict(row)
+
+    async def get_saved_audience(self, audience_id: int) -> dict[str, Any] | None:
+        async with session_scope() as db:
+            row = await db.get(SavedAudienceModel, audience_id)
+            return self._audience_dict(row) if row else None
+
+    @staticmethod
+    def _audience_dict(a: "SavedAudienceModel") -> dict[str, Any]:
+        return {"id": a.id, "name": a.name, "channel": a.channel, "reach": a.reach,
+                "spec": a.spec_json or {}, "created_at": a.created_at.isoformat() if a.created_at else None}
 
     # ── Serializers ───────────────────────────────────────────────────────────
 

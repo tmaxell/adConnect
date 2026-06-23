@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 # Action id → owning agent. Every campaign-wizard action belongs to the builder.
 _ACTION_AGENT: dict[str, str] = {
+    "select_objective": "campaign_builder",
+    "confirm_brief": "campaign_builder",
     "select_channel": "campaign_builder",
     "select_segment": "campaign_builder",
     "keep_audience": "campaign_builder",

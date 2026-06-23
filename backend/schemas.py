@@ -159,8 +159,8 @@ class AnalyticsSummary(BaseModel):
 
 # Wizard steps in product order. `ready` is a terminal pseudo-step meaning every
 # required slot is filled and the draft can be submitted for moderation.
-WizardStep = Literal["channel", "segments", "message", "cost", "confirmation", "ready"]
-WIZARD_STEPS: tuple[WizardStep, ...] = ("channel", "segments", "message", "cost", "confirmation")
+WizardStep = Literal["brief", "channel", "segments", "message", "cost", "confirmation", "ready"]
+WIZARD_STEPS: tuple[WizardStep, ...] = ("brief", "channel", "segments", "message", "cost", "confirmation")
 
 Channel = Literal["sms", "email", "meta"]
 Demographics = Literal["all", "men", "women"]
@@ -249,6 +249,16 @@ class MetaSpec(BaseModel):
     creative: MetaCreative = Field(default_factory=MetaCreative)
 
 
+class BusinessProfile(BaseModel):
+    """Durable advertiser context, set once and used to pre-fill every campaign brief."""
+    company_name: str | None = None
+    industry: str | None = None
+    website: str | None = None
+    tone: str | None = None                # preferred tone of voice for copy
+    default_product: str | None = None     # main product/service advertised
+    description: str | None = None         # short "about us" for the model
+
+
 class PlatformStat(BaseModel):
     """Per-publisher-platform forecast row (mirrors an Insights publisher_platform breakdown)."""
     platform: str
@@ -293,6 +303,9 @@ class CampaignDraft(BaseModel):
     name: str | None = None
     goal: str | None = None                       # the user's original intent, in their words
     product: str | None = None                    # what is being advertised
+    company: str | None = None                    # advertiser / brand (from profile or brief)
+    offer: str | None = None                      # the concrete offer / promo for this campaign
+    brief_confirmed: bool = False                 # user passed the brief step (product + objective)
     channel: Channel | None = None
     segments: SegmentSpec = Field(default_factory=SegmentSpec)
     message: MessageSpec = Field(default_factory=MessageSpec)
@@ -307,10 +320,17 @@ class CampaignDraft(BaseModel):
     platform_breakdown: list[PlatformStat] = Field(default_factory=list)  # Meta per-platform split
 
     status: Literal["draft", "submitted"] = "draft"
-    step: WizardStep = "channel"
+    step: WizardStep = "brief"
+
+    def is_brief_ready(self) -> bool:
+        """Brief step is complete once the user has confirmed it (canvas requires a
+        product before enabling 'continue'; the chat agent confirms on first reply)."""
+        return self.brief_confirmed
 
     def current_step(self) -> WizardStep:
         """First wizard step whose required slots are not yet filled."""
+        if not self.is_brief_ready():
+            return "brief"
         if self.channel is None:
             return "channel"
         if not self.segments.is_ready():

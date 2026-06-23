@@ -33,7 +33,11 @@ def apply_patch(draft: CampaignDraft, patch: dict[str, Any]) -> CampaignDraft:
     creative = meta.creative
 
     for key, value in patch.items():
-        if key == "channel" and value in ("sms", "email", "meta"):
+        if key in ("product", "company", "offer", "goal"):
+            setattr(draft, key, str(value).strip() if value else None)
+        elif key == "brief_confirmed":
+            draft.brief_confirmed = bool(value)
+        elif key == "channel" and value in ("sms", "email", "meta"):
             draft.channel = value  # type: ignore[assignment]
         elif key == "objective" and value in ("awareness", "traffic", "engagement", "leads", "sales"):
             meta.objective = value  # type: ignore[assignment]

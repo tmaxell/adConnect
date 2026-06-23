@@ -152,3 +152,28 @@ class CampaignModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class BusinessProfileModel(Base):
+    """Durable advertiser context (single row, id=1) — pre-fills every campaign brief."""
+
+    __tablename__ = "business_profile"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    data_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class SavedAudienceModel(Base):
+    """A reusable audience the user saved — picked again in the audience step."""
+
+    __tablename__ = "saved_audiences"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    channel: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    reach: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    spec_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

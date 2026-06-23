@@ -5,6 +5,17 @@ from tools.creative_gen import generate_svg
 from tools.draft_ops import apply_patch
 
 
+def test_brief_gates_first_step():
+    d = CampaignDraft()
+    assert d.current_step() == "brief"          # nothing confirmed yet
+    apply_patch(d, {"product": "Фитнес-клуб", "company": "FitLab", "offer": "Первый месяц бесплатно"})
+    assert d.product == "Фитнес-клуб" and d.company == "FitLab" and d.offer == "Первый месяц бесплатно"
+    assert d.current_step() == "brief"          # still needs confirmation
+    apply_patch(d, {"objective": "leads", "brief_confirmed": True})
+    assert d.meta.objective == "leads" and d.brief_confirmed is True
+    assert d.current_step() == "channel"        # brief done → channel next
+
+
 def test_select_channel_and_objective():
     d = CampaignDraft()
     apply_patch(d, {"channel": "meta", "objective": "leads"})

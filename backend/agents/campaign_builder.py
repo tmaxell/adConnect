@@ -67,6 +67,10 @@ async def execute(ctx: AgentContext) -> AgentResult:
         inferred = _infer_objective(ctx.message)
         if inferred != "traffic":
             draft.meta.objective = inferred
+        # A free-text reply on the brief step confirms it (the message describes the
+        # campaign; product/goal/objective are extracted above).
+        if prior_step == "brief":
+            draft.brief_confirmed = True
         # A free-text reply while on the segments step is the user describing their
         # audience → count it as an explicit audience decision.
         if prior_step == "segments":
@@ -132,6 +136,17 @@ async def _handle_action(ctx: AgentContext, draft: CampaignDraft, action_id: str
     step response.
     """
     payload = (ctx.action.payload if ctx.action else {}) or {}
+
+    if action_id == "select_objective":
+        obj = payload.get("objective")
+        if obj in ("awareness", "traffic", "engagement", "leads", "sales"):
+            draft.meta.objective = obj
+        draft.brief_confirmed = True
+        return None
+
+    if action_id == "confirm_brief":
+        draft.brief_confirmed = True
+        return None
 
     if action_id == "select_channel":
         if payload.get("channel") in ("sms", "email", "meta"):
@@ -349,6 +364,7 @@ async def _submit(ctx: AgentContext, draft: CampaignDraft) -> AgentResult:
 
 def _respond_for_step(draft: CampaignDraft) -> AgentResult:
     handler = {
+        "brief": _ask_brief,
         "channel": _ask_channel,
         "segments": _ask_segments,
         "message": _ask_message,
@@ -356,6 +372,30 @@ def _respond_for_step(draft: CampaignDraft) -> AgentResult:
         "confirmation": _confirm,
     }.get(draft.step, _confirm)
     return handler(draft)
+
+
+def _objective_actions(draft: CampaignDraft) -> list[ChatAction]:
+    return [
+        ChatAction(id="select_objective", label=_OBJECTIVE_LABEL[o], kind="primary", payload={"objective": o})
+        for o in ("awareness", "traffic", "engagement", "leads", "sales")
+    ]
+
+
+def _ask_brief(draft: CampaignDraft) -> AgentResult:
+    """First step: capture what's advertised + the campaign objective."""
+    if draft.product:
+        msg = (
+            f"Рекламируем: **{draft.product}**. Какая **цель** кампании?\n\n"
+            "Узнаваемость · Трафик · Вовлечённость · Лиды · Продажи — выберите ниже, "
+            "и перейдём к каналу и аудитории."
+        )
+        return _wrap(draft, msg, _objective_actions(draft), substep="brief")
+    msg = (
+        "Давайте начнём с **брифа**. Что рекламируем — продукт или услуга? "
+        "Например: «фитнес-клуб, первый месяц бесплатно». Заодно скажите цель "
+        "(лиды, продажи, трафик…) — это поможет точнее подобрать аудиторию и креативы."
+    )
+    return _wrap(draft, msg, _objective_actions(draft), substep="brief")
 
 
 def _wrap(draft: CampaignDraft, message: str, actions: list[ChatAction], *,

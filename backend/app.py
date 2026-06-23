@@ -131,6 +131,21 @@ async def list_campaigns():
     return await store.list_campaigns()
 
 
+# ── Business profile ──────────────────────────────────────────────────────────
+
+@app.get("/api/profile")
+async def get_profile():
+    """Durable advertiser context that pre-fills every campaign brief."""
+    return await store.get_profile()
+
+
+@app.put("/api/profile")
+async def put_profile(profile: dict[str, Any]):
+    allowed = {"company_name", "industry", "website", "tone", "default_product", "description"}
+    data = {k: v for k, v in (profile or {}).items() if k in allowed}
+    return await store.save_profile(data)
+
+
 # ── Analytics ─────────────────────────────────────────────────────────────────
 # One source of truth (tools/analytics) serves both this page and the Copilot
 # reporting agent, so figures and recommendations match everywhere.
