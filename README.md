@@ -2,8 +2,12 @@
 
 Prototype of the AdConnect AI features: a floating chat widget over the product UI,
 backed by a multi-agent system whose flagship **campaign-builder agent** assembles a
-full advertising campaign from a natural-language request (channel → audience →
-creatives → budget → confirmation). A second **analyst agent** reports campaign
+full advertising campaign from a natural-language request (brief & objective →
+channel → audience → creatives → budget → confirmation). A reusable **business
+profile** pre-fills each brief; audiences can be **saved and reused**; the operator
+audience supports extended telecom filters (tariff, ARPU, device, triggers…); and
+offers/creatives are generated from the full context (product, company, offer,
+objective, audience). A second **analyst agent** reports campaign
 performance and recommends fixes — the same data powers the **Analytics** page and
 the Copilot reports (one backend source, `tools/analytics.py`).
 
@@ -48,7 +52,7 @@ cd frontend && npm install && npm run dev   # http://localhost:5173 (proxies /ap
 ## Test
 
 ```bash
-cd backend && source .venv/bin/activate && pytest    # 57 tests
+cd backend && source .venv/bin/activate && pytest    # 63 tests
 ```
 
 ## Try it (SMB scenarios)
