@@ -28,7 +28,7 @@ import {
 } from "../types/campaign";
 import { NETWORK_CHANNELS, OPERATOR_CHANNELS, type ChannelCard } from "./channels";
 import { useChatWorkspaceStore } from "../chat-workspace/store/chatWorkspaceStore";
-import { getAudiences, getProfile, saveAudience, type AudienceItem } from "../api/chatApi";
+import { getAudiences, getProfile, saveAudience, type AudienceItem, type AudienceLibrary } from "../api/chatApi";
 import type { BusinessProfile } from "../types/campaign";
 
 const CHANNEL_LABEL: Record<string, string> = { sms: "SMS", email: "Email", meta: "Meta", whatsapp: "WhatsApp" };
@@ -573,21 +573,82 @@ function ChannelStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   );
 }
 
-// ── Saved-audience picker — reuse a previously built / preset audience ───────────
+// ── Audience registry — pick from / save to the shared audience registry ─────────
 
-function AudiencePicker({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
-  const [lib, setLib] = useState<{ saved: AudienceItem[]; presets: AudienceItem[] } | null>(null);
-  const [saving, setSaving] = useState(false);
-  const reload = () => getAudiences().then(setLib).catch(() => {});
-  useEffect(() => { reload(); }, []);
+function IconSave() {
+  return <svg className="acw-mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /><path d="M7 3v5h7V3" /><path d="M7 21v-7h10v7" /></svg>;
+}
 
-  const apply = (item: AudienceItem, isPreset: boolean) =>
+/** Modal listing the shared audience registry (saved + operator presets). */
+function AudienceRegistryModal({ draft, api, onClose }: { draft: CampaignDraft; api: WizardApi; onClose: () => void }) {
+  const [lib, setLib] = useState<AudienceLibrary | null>(null);
+  const [q, setQ] = useState("");
+  useEffect(() => { getAudiences().then(setLib).catch(() => {}); }, []);
+  const pick = (item: AudienceItem, isPreset: boolean) => {
     api.update({
       apply_segment_spec: item.spec,
       matched_segment_name: item.name,
       ...(isPreset ? { matched_segment_id: String(item.id) } : {}),
     });
+    onClose();
+  };
+  const match = (a: AudienceItem) => a.name.toLowerCase().includes(q.trim().toLowerCase());
+  const saved = (lib?.saved ?? []).filter(match);
+  const presets = (lib?.presets ?? []).filter(match);
+  const active = draft.segments.matched_segment_name;
+  const row = (a: AudienceItem, isPreset: boolean) => (
+    <button key={`${isPreset ? "p" : "s"}${a.id}`} type="button"
+      className={`acw-aud-row${active === a.name ? " on" : ""}`} title={a.description}
+      disabled={api.busy} onClick={() => pick(a, isPreset)}>
+      <span className="acw-aud-row-name">{a.name}</span>
+      <span className="acw-aud-row-reach">{fmt(a.reach)}</span>
+    </button>
+  );
+  return (
+    <div className="acw-modal-backdrop" onClick={onClose}>
+      <div className="acw-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="acw-modal-head">
+          <span className="acw-modal-title">Реестр аудиторий</span>
+          <button type="button" className="acw-modal-close" onClick={onClose} aria-label="Закрыть">×</button>
+        </div>
+        <input className="acw-modal-search" value={q} placeholder="Поиск по названию…"
+          onChange={(e) => setQ(e.target.value)} />
+        <div className="acw-modal-body">
+          {saved.length > 0 && (
+            <>
+              <div className="acw-aud-group">Мои сохранённые</div>
+              <div className="acw-modal-list">{saved.map((a) => row(a, false))}</div>
+            </>
+          )}
+          <div className="acw-aud-group">Готовые сегменты оператора</div>
+          <div className="acw-modal-list">{presets.map((a) => row(a, true))}</div>
+          {saved.length === 0 && presets.length === 0 && <div className="acw-hint">Ничего не найдено.</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
 
+/** Trigger that opens the registry modal and shows the chosen audience. */
+function AudiencePicker({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
+  const [open, setOpen] = useState(false);
+  const active = draft.segments.matched_segment_name;
+  return (
+    <Field label="Готовая аудитория" hint="Выберите аудиторию из реестра — ранее сохранённую или готовый сегмент оператора; параметры подставятся автоматически.">
+      <div className="acw-aud-pick">
+        {active && <span className="acw-chip acw-chip-accent">{active}</span>}
+        <button type="button" className="acw-btn acw-btn-ghost" disabled={api.busy} onClick={() => setOpen(true)}>
+          {active ? "Сменить аудиторию" : "Выбрать готовую аудиторию"}
+        </button>
+      </div>
+      {open && <AudienceRegistryModal draft={draft} api={api} onClose={() => setOpen(false)} />}
+    </Field>
+  );
+}
+
+/** Save the current audience into the shared registry (sits at the bottom of the step). */
+function SaveAudienceButton({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
+  const [saving, setSaving] = useState(false);
   const save = async () => {
     const name = window.prompt("Название аудитории:", draft.product ? `Аудитория «${draft.product}»` : "Моя аудитория");
     if (!name) return;
@@ -597,41 +658,12 @@ function AudiencePicker({ draft, api }: { draft: CampaignDraft; api: WizardApi }
         name, channel: draft.channel, reach: draft.audience_reach,
         spec: draft.segments as unknown as Record<string, unknown>,
       });
-      await reload();
     } finally { setSaving(false); }
   };
-
-  const active = draft.segments.matched_segment_name;
   return (
-    <Field label="Готовая аудитория" hint="Выберите ранее сохранённую или готовый сегмент оператора — параметры подставятся автоматически.">
-      {lib && lib.saved.length > 0 && (
-        <>
-          <div className="acw-aud-group">Мои сохранённые</div>
-          <div className="acw-chips">
-            {lib.saved.map((a) => (
-              <button key={`s${a.id}`} type="button"
-                className={`acw-chip acw-chip-btn${active === a.name ? " acw-chip-accent" : " acw-chip-off"}`}
-                disabled={api.busy} onClick={() => apply(a, false)}>
-                {a.name} · {fmt(a.reach)}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-      <div className="acw-aud-group">Готовые сегменты оператора</div>
-      <div className="acw-chips">
-        {(lib?.presets ?? []).map((a) => (
-          <button key={`p${a.id}`} type="button"
-            className={`acw-chip acw-chip-btn${active === a.name ? " acw-chip-accent" : " acw-chip-off"}`}
-            disabled={api.busy} onClick={() => apply(a, true)} title={a.description}>
-            {a.name} · {fmt(a.reach)}
-          </button>
-        ))}
-      </div>
-      <button type="button" className="acw-btn acw-btn-ghost acw-aud-save" disabled={api.busy || saving} onClick={save}>
-        {saving ? "Сохраняю…" : "＋ Сохранить текущую аудиторию"}
-      </button>
-    </Field>
+    <button type="button" className="acw-btn acw-btn-ghost acw-aud-save" disabled={api.busy || saving} onClick={save}>
+      {saving ? <Spinner /> : <IconSave />}{saving ? "Сохраняю…" : "Сохранить аудиторию в реестр"}
+    </button>
   );
 }
 
@@ -960,9 +992,17 @@ function WhatsAppAudienceStep({ draft, api }: { draft: CampaignDraft; api: Wizar
 }
 
 function SegmentsStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
-  if (isNetworkChannel(draft.channel)) return <MetaAudienceStep draft={draft} api={api} />;
-  if (draft.channel === "whatsapp") return <WhatsAppAudienceStep draft={draft} api={api} />;
-  return <OperatorSegmentsStep draft={draft} api={api} />;
+  const content = isNetworkChannel(draft.channel)
+    ? <MetaAudienceStep draft={draft} api={api} />
+    : draft.channel === "whatsapp"
+      ? <WhatsAppAudienceStep draft={draft} api={api} />
+      : <OperatorSegmentsStep draft={draft} api={api} />;
+  return (
+    <>
+      {content}
+      <div className="acw-aud-savebar"><SaveAudienceButton draft={draft} api={api} /></div>
+    </>
+  );
 }
 
 // ── Message / creative step ──────────────────────────────────────────────────────

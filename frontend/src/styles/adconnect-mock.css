@@ -808,6 +808,24 @@ button.ac-side-sub { appearance: none; -webkit-appearance: none; width: 100%; bo
 .acw-extra-caret { color: var(--ac-text-muted); font-size: 11px; }
 .acw-extra-body { display: flex; flex-direction: column; gap: 16px; padding: 14px; border-top: 1px solid var(--ac-border); }
 
-/* Saved-audience picker */
+/* Audience registry picker + save */
 .acw-aud-group { font-size: 12px; font-weight: 600; color: var(--ac-text-secondary); margin-top: 8px; margin-bottom: 4px; }
-.acw-aud-save { margin-top: 12px; align-self: flex-start; }
+.acw-aud-save { margin-top: 0; align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; }
+.acw-aud-pick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.acw-aud-savebar { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--ac-border); }
+
+/* Registry modal */
+.acw-modal-backdrop { position: fixed; inset: 0; z-index: 1200; background: rgba(15, 23, 42, 0.45); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.acw-modal { width: 100%; max-width: 480px; max-height: 80vh; display: flex; flex-direction: column; background: var(--ac-surface); border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,0.28); overflow: hidden; }
+.acw-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--ac-border); }
+.acw-modal-title { font-size: 15px; font-weight: 700; }
+.acw-modal-close { border: 0; background: none; cursor: pointer; font-size: 22px; line-height: 1; color: var(--ac-text-muted); padding: 0 4px; }
+.acw-modal-search { margin: 12px 16px 0; padding: 9px 12px; border: 1px solid var(--ac-border); border-radius: 8px; font: inherit; font-size: 14px; }
+.acw-modal-body { padding: 6px 16px 16px; overflow-y: auto; }
+.acw-modal-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.acw-aud-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; padding: 10px 12px; border: 1px solid var(--ac-border); border-radius: 9px; background: var(--ac-surface); cursor: pointer; font: inherit; transition: border-color .12s, background .12s; }
+.acw-aud-row:not(:disabled):hover { border-color: var(--ac-accent); }
+.acw-aud-row.on { border-color: var(--ac-accent); box-shadow: 0 0 0 1px var(--ac-accent); background: var(--ac-accent-soft); }
+.acw-aud-row:disabled { cursor: default; opacity: 0.6; }
+.acw-aud-row-name { font-size: 14px; font-weight: 600; }
+.acw-aud-row-reach { font-size: 13px; color: var(--ac-text-secondary); flex-shrink: 0; }
