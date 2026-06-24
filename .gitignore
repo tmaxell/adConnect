@@ -25,3 +25,6 @@ frontend/node_modules/
 # ── Editors ───────────────────────────────────────────────────────────────────
 .idea/
 .vscode/
+
+# Local Claude Code preview/run tooling
+.claude/launch.json
