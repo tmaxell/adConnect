@@ -12,6 +12,7 @@ import { useChatWorkspaceStore } from "../chat-workspace/store/chatWorkspaceStor
 import { CampaignWizard } from "./CampaignWizard";
 import { AnalyticsPage } from "./AnalyticsPage";
 import { ProfilePage } from "./ProfilePage";
+import { AudiencesPage } from "./AudiencesPage";
 import { LogoFull } from "./Logo";
 
 const USER_EMAIL = "ivani_gp@starcorp.com";
@@ -58,15 +59,6 @@ const CAMPAIGNS: CampaignRow[] = SMB_CAMPAIGNS.map((c, i) => ({
 }));
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
-
-function PlusBox() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-      <rect x="0.75" y="0.75" width="16.5" height="16.5" rx="5" stroke="#5257FF" strokeWidth="1.5" />
-      <path d="M12 9H6M9 6v6" stroke="#5257FF" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 function CampaignsIcon() {
   return (
@@ -210,13 +202,16 @@ function AdcSidebar() {
             <span>Ad Campaigns</span>
           </span>
         </button>
-        <div className="ac-side-item">
+        <button
+          type="button"
+          className={`ac-side-item${view === "audiences" ? " ac-side-item-active" : ""}`}
+          onClick={() => setView("audiences", null)}
+        >
           <span className="ac-side-item-main">
             <SegmentsIcon />
             <span>Audience Segments</span>
           </span>
-          <button className="ac-side-add" type="button" title="New segment"><PlusBox /></button>
-        </div>
+        </button>
         <button
           type="button"
           className={`ac-side-item${view === "analytics" ? " ac-side-item-active" : ""}`}
@@ -385,6 +380,8 @@ export function AdConnectMock() {
             ? <AnalyticsPage />
             : view === "profile"
             ? <ProfilePage />
+            : view === "audiences"
+            ? <AudiencesPage />
             : campaignDraft ? <CampaignWizard draft={campaignDraft} /> : <AdcCampaignsScreen />}
         </main>
       </div>

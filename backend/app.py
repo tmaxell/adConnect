@@ -174,6 +174,14 @@ async def save_audience(request: SaveAudienceRequest):
                                      reach=request.reach, spec=request.spec)
 
 
+@app.delete("/api/audiences/{audience_id}")
+async def delete_audience(audience_id: int):
+    """Remove a saved audience from the registry (presets are not deletable)."""
+    if not await store.delete_saved_audience(audience_id):
+        raise HTTPException(status_code=404, detail="Audience not found")
+    return {"ok": True}
+
+
 # ── Analytics ─────────────────────────────────────────────────────────────────
 # One source of truth (tools/analytics) serves both this page and the Copilot
 # reporting agent, so figures and recommendations match everywhere.

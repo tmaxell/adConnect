@@ -35,9 +35,9 @@ interface ChatWorkspaceState {
    *  so the wizard can follow the agent without yanking the view during clicks. */
   draftRev: number;
   /** Which product screen is shown in the canvas. */
-  view: "campaigns" | "analytics" | "profile";
+  view: "campaigns" | "analytics" | "profile" | "audiences";
   analyticsCampaignId: number | null;
-  setView: (view: "campaigns" | "analytics" | "profile", campaignId?: number | null) => void;
+  setView: (view: "campaigns" | "analytics" | "profile" | "audiences", campaignId?: number | null) => void;
   loadingSessions: boolean;
   loadingMessages: boolean;
   sending: boolean;
@@ -122,11 +122,11 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draftRev, setDraftRev] = useState(0);
-  const [view, setViewState] = useState<"campaigns" | "analytics" | "profile">("campaigns");
+  const [view, setViewState] = useState<"campaigns" | "analytics" | "profile" | "audiences">("campaigns");
   const [analyticsCampaignId, setAnalyticsCampaignId] = useState<number | null>(null);
   const userActedRef = useRef(false);
   const bumpDraft = useCallback(() => setDraftRev((r) => r + 1), []);
-  const setView = useCallback((v: "campaigns" | "analytics" | "profile", campaignId: number | null = null) => {
+  const setView = useCallback((v: "campaigns" | "analytics" | "profile" | "audiences", campaignId: number | null = null) => {
     setViewState(v);
     setAnalyticsCampaignId(campaignId);
   }, []);

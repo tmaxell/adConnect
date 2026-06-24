@@ -829,3 +829,16 @@ button.ac-side-sub { appearance: none; -webkit-appearance: none; width: 100%; bo
 .acw-aud-row:disabled { cursor: default; opacity: 0.6; }
 .acw-aud-row-name { font-size: 14px; font-weight: 600; }
 .acw-aud-row-reach { font-size: 13px; color: var(--ac-text-secondary); flex-shrink: 0; }
+
+/* Audience registry page */
+.aud-section-title { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+.aud-list { display: flex; flex-direction: column; gap: 8px; }
+.aud-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--ac-border); border-radius: 9px; background: var(--ac-surface); }
+.aud-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.aud-row-name { font-size: 14px; font-weight: 600; }
+.aud-row-sub { font-size: 12px; color: var(--ac-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aud-row-reach { font-size: 13px; font-weight: 600; color: var(--ac-text-secondary); flex-shrink: 0; }
+.aud-row-tag { font-size: 11px; color: var(--ac-text-muted); background: #eef1f6; border-radius: 6px; padding: 3px 8px; flex-shrink: 0; }
+.aud-row-del { border: 0; background: none; cursor: pointer; color: var(--ac-text-muted); font-size: 14px; padding: 4px 6px; border-radius: 6px; flex-shrink: 0; }
+.aud-row-del:hover { color: #dc2626; background: #fef2f2; }
+.aud-empty { font-size: 13px; color: var(--ac-text-secondary); }

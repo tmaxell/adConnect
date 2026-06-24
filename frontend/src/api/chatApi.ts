@@ -429,3 +429,7 @@ export async function saveAudience(body: {
 }): Promise<AudienceItem> {
   return http<AudienceItem>("/api/audiences", { method: "POST", body: JSON.stringify(body) });
 }
+
+export async function deleteAudience(id: number | string): Promise<void> {
+  await http<unknown>(`/api/audiences/${encodeURIComponent(String(id))}`, { method: "DELETE" });
+}

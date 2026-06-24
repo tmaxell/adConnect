@@ -415,6 +415,14 @@ class ChatStore:
             row = await db.get(SavedAudienceModel, audience_id)
             return self._audience_dict(row) if row else None
 
+    async def delete_saved_audience(self, audience_id: int) -> bool:
+        async with session_scope() as db:
+            row = await db.get(SavedAudienceModel, audience_id)
+            if row is None:
+                return False
+            await db.delete(row)
+            return True
+
     @staticmethod
     def _audience_dict(a: "SavedAudienceModel") -> dict[str, Any]:
         return {"id": a.id, "name": a.name, "channel": a.channel, "reach": a.reach,
