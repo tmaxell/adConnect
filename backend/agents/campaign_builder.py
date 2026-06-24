@@ -413,7 +413,7 @@ async def _submit(ctx: AgentContext, draft: CampaignDraft) -> AgentResult:
     if draft.channel == "whatsapp":
         msg = (
             f"Кампания **«{draft.name}»** собрана. Шаблон карусели отправлен на согласование в Meta "
-            f"через агрегатора (обычно до 24 ч). Рассылки и списания не произошло — это произойдёт "
+            f"(обычно до 24 ч). Рассылки и списания не произошло — это произойдёт "
             f"только после одобрения шаблона и вашего подтверждения.\n\n{_summary(draft)}"
         )
     else:
@@ -485,8 +485,8 @@ def _ask_channel(draft: CampaignDraft) -> AgentResult:
         f"{_intro_line(draft)}Начнём с **канала**. Где показываем рекламу?\n\n"
         f"- **SMS** — мгновенный контакт, {CHANNELS['sms'].base_price_per_message} ₽/сообщение.\n"
         f"- **Email** — для длинных сообщений, {CHANNELS['email'].base_price_per_message} ₽/сообщение.\n"
-        f"- **WhatsApp Business** — карусель-рассылка через бота под аккаунтом оператора "
-        f"(агрегатор). ≈ {wa.base_price_per_message:.0f} ₽ за диалог; дальнейшая переписка с ботом — бесплатно.\n"
+        f"- **WhatsApp Business** — карусель-рассылка через бота под аккаунтом оператора. "
+        f"≈ {wa.base_price_per_message:.0f} ₽ за диалог; дальнейшая переписка с ботом — бесплатно.\n"
         f"- **Meta Ads** — Facebook, Instagram и WhatsApp. Ваша аудитория загружается как "
         f"Custom Audience (по хешам телефонов), оплата за показы (CPM ≈ {meta.avg_cpm:.0f} ₽)."
     )
@@ -509,7 +509,7 @@ def _ask_segments(draft: CampaignDraft) -> AgentResult:
             else (f"выделенный отправитель «{draft.whatsapp.sender_name}»" if draft.whatsapp.sender_name
                   else "выделенный отправитель")
         msg = (
-            f"Канал: **{ci.label}**. Отправка идёт через агрегатора под {sender} — подключать свой "
+            f"Канал: **{ci.label}**. Отправка идёт под {sender} — подключать свой "
             f"аккаунт не нужно. Теперь — **аудитория**.{hint}\n\n"
             f"Опишите, кого охватить (гео, возраст, интересы), либо я подберу сегмент абонентской базы. "
             f"Сообщения уйдут только подписчикам с WhatsApp (покрытие ≈ {ci.coverage * 100:.0f}% базы, opt-in)."

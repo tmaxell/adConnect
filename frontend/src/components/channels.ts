@@ -50,7 +50,7 @@ export const OPERATOR_CHANNELS: ChannelCard[] = [
     group: "operator",
     status: "available",
     pricePerMessage: 9,
-    audienceLanding: "WhatsApp opt-in (через агрегатора)",
+    audienceLanding: "WhatsApp opt-in",
     note: "Открытие диалога платное, дальнейшая переписка с ботом — бесплатно",
   },
 ];

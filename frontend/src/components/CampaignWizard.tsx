@@ -901,7 +901,6 @@ function OperatorSegmentsStep({ draft, api }: { draft: CampaignDraft; api: Wizar
           disabled={api.busy}
           placeholder="+ интерес"
         />
-        <div className="acw-sub-field"><Chips items={s.children_age} empty="Возраст детей" /></div>
       </Field>
 
       <OperatorExtraFilters draft={draft} api={api} />
@@ -918,8 +917,8 @@ function WhatsAppSetup({ draft, api }: { draft: CampaignDraft; api: WizardApi })
     <>
       <div className="acw-meta-account">
         <span className="acw-meta-account-dot" />
-        Рассылка идёт через агрегатора (Woztell) под аккаунтом оператора — подключать свой
-        аккаунт WhatsApp не нужно. Шаблон проходит согласование в Meta.
+        Рассылка идёт под аккаунтом оператора — подключать свой аккаунт WhatsApp не нужно.
+        Шаблон проходит согласование в Meta.
       </div>
       <Field label="Отправитель" hint="Общий аккаунт оператора подходит большинству. Крупным рекламодателям оператор заводит выделенного отправителя со своим именем.">
         <Segmented
@@ -939,7 +938,7 @@ function WhatsAppSetup({ draft, api }: { draft: CampaignDraft; api: WizardApi })
               onCommit={(v) => api.update({ wa_sender_name: v })}
               disabled={api.busy}
             />
-            <div className="acw-hint">Выделенного отправителя и его верификацию готовит оператор через агрегатора.</div>
+            <div className="acw-hint">Выделенного отправителя и его верификацию готовит оператор.</div>
           </div>
         )}
       </Field>
@@ -1445,7 +1444,6 @@ function ConfirmationStep({ draft }: { draft: CampaignDraft }) {
     rows.push(["Цена за диалог", `${draft.price_per_message} ₽`]);
   } else {
     rows.push(["Доход", s.monthly_income || "—"]);
-    rows.push(["Возраст детей", s.children_age.join(", ") || "—"]);
   }
   const creative = draft.meta.creative;
   return (

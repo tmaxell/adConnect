@@ -50,13 +50,13 @@ CHANNELS: dict[str, ChannelInfo] = {
     "whatsapp": ChannelInfo(
         id="whatsapp",
         label="WhatsApp Business",
-        description="Карусель-рассылка через бота под аккаунтом оператора (агрегатор)",
+        description="Карусель-рассылка через бота под аккаунтом оператора",
         kind="messaging",
         # Marketing template, per delivered message (~$0.10). Opening the chat is
         # paid; the operator bot then continues the conversation for free (24h).
         base_price_per_message=9.0,
         coverage=0.7,                      # subscribers reachable on WhatsApp + opted in
-        audience_landing="WhatsApp opt-in (сопоставление через агрегатора)",
+        audience_landing="WhatsApp opt-in",
     ),
     "meta": ChannelInfo(
         id="meta",
