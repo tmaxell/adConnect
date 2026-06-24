@@ -945,7 +945,7 @@ function OperatorSegmentsStep({ draft, api }: { draft: CampaignDraft; api: Wizar
           <div className="acw-chips"><span className="acw-chip acw-chip-accent">{s.matched_segment_name}</span></div>
         </Field>
       )}
-      <Field label="География" badge="0.3 ₽">
+      <Field label="География">
         <EditableChips
           items={s.geography}
           empty="Регион или город"
@@ -955,7 +955,7 @@ function OperatorSegmentsStep({ draft, api }: { draft: CampaignDraft; api: Wizar
           placeholder="+ город"
         />
       </Field>
-      <Field label="Демография" badge="0.3 ₽">
+      <Field label="Демография">
         <GenderRadios value={s.demographics} onChange={(v) => api.update({ demographics: v })} disabled={api.busy} />
         <div className="acw-sub-field">
           <EditableChips
