@@ -20,6 +20,7 @@ import {
   WA_MAX_CARDS,
   type CampaignDraft,
   type Channel,
+  type CtaType,
   type MediaType,
   type MetaFormat,
   type WhatsAppButton,
@@ -520,6 +521,39 @@ function ObjectiveCards({ value, onPick, disabled }: { value: string; onPick: (o
   );
 }
 
+const CTA_OPTIONS: Array<{ id: CtaType; label: string }> = [
+  { id: "site", label: "Сайт" },
+  { id: "whatsapp", label: "WhatsApp" },
+  { id: "lead", label: "Заявка" },
+  { id: "call", label: "Звонок" },
+];
+
+function CtaPicker({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
+  const cta = draft.cta_type;
+  const showLink = cta === "site" || cta === "lead";
+  const showPhone = cta === "call";
+  return (
+    <>
+      <div className="acw-chips">
+        {CTA_OPTIONS.map((o) => (
+          <button key={o.id} type="button"
+            className={`acw-chip acw-chip-btn${cta === o.id ? " acw-chip-accent" : " acw-chip-off"}`}
+            disabled={api.busy} onClick={() => api.update({ cta_type: cta === o.id ? null : o.id })}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+      {(showLink || showPhone) && (
+        <div className="acw-sub-field">
+          <EditableText value={draft.destination_url}
+            placeholder={showPhone ? "Телефон — например, +7 900 000-00-00" : "Ссылка — https://…"}
+            onCommit={(v) => api.update({ destination_url: v })} disabled={api.busy} />
+        </div>
+      )}
+    </>
+  );
+}
+
 function BriefStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
   useEffect(() => { getProfile().then(setProfile).catch(() => {}); }, []);
@@ -544,6 +578,13 @@ function BriefStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
       <Field label="Оффер (необязательно)" hint="Спецпредложение этой кампании — например: «первый месяц бесплатно», «скидка 20%».">
         <EditableText value={draft.offer} placeholder="Скидка, бонус, акция…"
           onCommit={(v) => api.update({ offer: v })} disabled={api.busy} />
+      </Field>
+      <Field label="Ключевое преимущество (необязательно)" hint="Одна главная мысль креатива — чем вы лучше: например, «современное оборудование и тренеры-чемпионы».">
+        <EditableText value={draft.key_message} placeholder="Что выделяет вас среди конкурентов…"
+          onCommit={(v) => api.update({ key_message: v })} disabled={api.busy} />
+      </Field>
+      <Field label="Целевое действие" hint="Куда ведём клиента — определяет призыв и кнопки в креативе.">
+        <CtaPicker draft={draft} api={api} />
       </Field>
       <Field label="Цель кампании" hint="Определяет, под что Copilot оптимизирует подбор и креативы.">
         <ObjectiveCards value={draft.meta.objective} onPick={(o) => api.update({ objective: o })} disabled={api.busy} />

@@ -26,7 +26,7 @@ import time
 from typing import Any
 
 from agents.base import AgentContext, AgentResult
-from schemas import META_PLACEMENTS, CampaignDraft, ChatAction, WhatsAppButton, WhatsAppCard
+from schemas import CTA_LABEL, META_PLACEMENTS, CampaignDraft, ChatAction, WhatsAppButton, WhatsAppCard
 from tools import context
 from tools import creative_gen
 from tools import creatives as creatives_tool
@@ -270,6 +270,8 @@ async def _copy_context(ctx: AgentContext, draft: CampaignDraft) -> dict[str, An
         "audience": audience,
         "company": draft.company or profile.get("company_name"),
         "offer": draft.offer,
+        "key_message": draft.key_message,
+        "cta": CTA_LABEL.get(draft.cta_type) if draft.cta_type else None,
         "objective": draft.meta.objective,
         "tone": profile.get("tone"),
     }
@@ -295,6 +297,14 @@ async def _generate_creatives(ctx: AgentContext, draft: CampaignDraft) -> AgentR
     return _wrap(draft, "\n".join(lines), actions, substep="message")
 
 
+def _wa_default_buttons(draft: CampaignDraft) -> list[WhatsAppButton]:
+    """Default card button — a link button from the brief CTA, else a quick reply."""
+    if draft.destination_url and draft.cta_type in ("site", "lead"):
+        label = "Перейти на сайт" if draft.cta_type == "site" else "Оставить заявку"
+        return [WhatsAppButton(type="url", label=label, value=draft.destination_url)]
+    return [WhatsAppButton(type="quick_reply", label="Подробнее")]
+
+
 async def _generate_wa_carousel(ctx: AgentContext, draft: CampaignDraft, *, n: int = 3) -> AgentResult:
     """Assemble a WhatsApp Business creative for the chosen format: copy → cards.
 
@@ -315,7 +325,7 @@ async def _generate_wa_carousel(ctx: AgentContext, draft: CampaignDraft, *, n: i
         cards.append(WhatsAppCard(
             media_type="image" if with_media else "none", media_url=url,
             media_source="generated" if with_media else None, body=body,
-            buttons=[WhatsAppButton(type="quick_reply", label="Подробнее")],
+            buttons=_wa_default_buttons(draft),
         ))
     draft.whatsapp.cards = cards
     await ctx.emit("tool_called", detail=f"generate_wa_creative({fmt}) → {len(cards)} card(s)")

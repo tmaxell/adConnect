@@ -188,6 +188,15 @@ def test_whatsapp_card_add_edit_remove_and_cap():
     assert len(d.whatsapp.cards) == 9
 
 
+def test_brief_key_message_and_cta():
+    d = CampaignDraft()
+    apply_patch(d, {"key_message": "тренеры-чемпионы", "cta_type": "site", "destination_url": "https://x"})
+    assert d.key_message == "тренеры-чемпионы"
+    assert d.cta_type == "site" and d.destination_url == "https://x"
+    apply_patch(d, {"cta_type": "bogus"})          # invalid → cleared
+    assert d.cta_type is None
+
+
 def test_whatsapp_auto_reply_toggle():
     d = CampaignDraft(channel="whatsapp")
     apply_patch(d, {"toggle_wa_auto_reply": True, "wa_greeting": "Здравствуйте!"})

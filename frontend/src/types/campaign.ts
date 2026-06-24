@@ -18,6 +18,7 @@ export interface BusinessProfile {
 
 export type Channel = "sms" | "email" | "meta" | "whatsapp";
 export type Demographics = "all" | "men" | "women";
+export type CtaType = "site" | "whatsapp" | "call" | "lead";
 
 /** Network (auction/CPM) channels vs operator messaging channels. */
 export const NETWORK_CHANNELS_IDS: Channel[] = ["meta"];
@@ -143,6 +144,9 @@ export interface CampaignDraft {
   product: string | null;
   company: string | null;
   offer: string | null;
+  key_message: string | null;
+  cta_type: CtaType | null;
+  destination_url: string | null;
   brief_confirmed: boolean;
   channel: Channel | null;
   segments: SegmentSpec;

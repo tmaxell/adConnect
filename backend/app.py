@@ -33,7 +33,7 @@ from pydantic import BaseModel, Field
 from agents.base import AgentContext
 from agents.supervisor import handle as supervisor_handle
 from db import ChatStore, init_db
-from schemas import CampaignDraft, ChatAction, ChatArtifact, ChatTraceEvent, WhatsAppCard
+from schemas import CTA_LABEL, CampaignDraft, ChatAction, ChatArtifact, ChatTraceEvent, WhatsAppCard
 from tools import analytics, catalog, context, creative_gen, creatives as creatives_tool, naming
 from tools.draft_ops import apply_patch
 from tools.forecast import apply_forecast
@@ -350,6 +350,8 @@ async def generate_copy(session_id: str, request: CopyGenerateRequest):
         product=brief or draft.product or profile.get("default_product"),
         goal=draft.goal, channel=draft.channel or "meta", audience=audience,
         company=draft.company or profile.get("company_name"), offer=draft.offer,
+        key_message=draft.key_message,
+        cta=CTA_LABEL.get(draft.cta_type) if draft.cta_type else None,
         objective=draft.meta.objective, tone=request.tone or profile.get("tone"),
         n=max(1, min(5, request.n)),
     )

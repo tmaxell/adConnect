@@ -78,6 +78,7 @@ _TONE_HINT = {
 async def _llm_variants(
     product: str, goal: str, channel: str, audience: str, n: int, tone: str | None = None,
     company: str | None = None, offer: str | None = None, objective: str | None = None,
+    key_message: str | None = None, cta: str | None = None,
 ) -> list[str]:
     try:
         from langchain_core.messages import HumanMessage, SystemMessage
@@ -93,7 +94,9 @@ async def _llm_variants(
             f"Product/service: {product or '—'}\n"
             f"Company/brand: {company or '—'}\n"
             f"Offer: {offer or '—'}\n"
+            f"Key message / USP: {key_message or '—'}\n"
             f"Goal (in user words): {goal or '—'}\n"
+            f"Desired call to action: {cta or '—'}\n"
             f"Channel: {channel}\n"
             f"Audience: {audience or '—'}"
         )
@@ -136,6 +139,8 @@ async def generate_creatives(
     company: str | None = None,
     offer: str | None = None,
     objective: str | None = None,
+    key_message: str | None = None,
+    cta: str | None = None,
     n: int = 3,
     tone: str | None = None,
     use_llm: bool = True,
@@ -146,7 +151,8 @@ async def generate_creatives(
     variants: list[str] = []
     if use_llm:
         variants = await _llm_variants(product, goal, channel, audience or "", n, tone,
-                                       company=company, offer=offer, objective=objective)
+                                       company=company, offer=offer, objective=objective,
+                                       key_message=key_message, cta=cta)
     if not variants:
         variants = _fallback_variants(product, goal, channel, offer)[:n]
     if channel == "sms":

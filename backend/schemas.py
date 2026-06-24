@@ -165,6 +165,15 @@ WIZARD_STEPS: tuple[WizardStep, ...] = ("brief", "channel", "segments", "message
 Channel = Literal["sms", "email", "meta", "whatsapp"]
 Demographics = Literal["all", "men", "women"]
 
+# Desired call to action — the destination the creative drives to.
+CtaType = Literal["site", "whatsapp", "call", "lead"]
+CTA_LABEL: dict[str, str] = {
+    "site": "перейти на сайт",
+    "whatsapp": "написать в WhatsApp",
+    "call": "позвонить",
+    "lead": "оставить заявку",
+}
+
 
 class SegmentSpec(BaseModel):
     """Audience parameters — the "Segments" wizard step.
@@ -384,6 +393,9 @@ class CampaignDraft(BaseModel):
     product: str | None = None                    # what is being advertised
     company: str | None = None                    # advertiser / brand (from profile or brief)
     offer: str | None = None                      # the concrete offer / promo for this campaign
+    key_message: str | None = None                # USP / single key message for the creative
+    cta_type: CtaType | None = None               # desired call to action
+    destination_url: str | None = None            # landing / link backing the CTA
     brief_confirmed: bool = False                 # user passed the brief step (product + objective)
     channel: Channel | None = None
     segments: SegmentSpec = Field(default_factory=SegmentSpec)
