@@ -161,7 +161,9 @@ def _apply_whatsapp_patch(draft: CampaignDraft, key: str, value: Any) -> bool:
     Returns True when the key was a WhatsApp key (handled), False otherwise.
     """
     wa = draft.whatsapp
-    if key == "wa_sender_mode" and value in ("shared", "dedicated"):
+    if key == "wa_format" and value in ("single", "carousel", "text"):
+        wa.format = value
+    elif key == "wa_sender_mode" and value in ("shared", "dedicated"):
         wa.sender_mode = value
     elif key == "wa_sender_name":
         wa.sender_name = str(value).strip() if value else None

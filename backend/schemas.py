@@ -296,13 +296,20 @@ class WhatsAppCard(BaseModel):
 WhatsAppSenderMode = Literal["shared", "dedicated"]
 WhatsAppTemplateStatus = Literal["draft", "pending", "approved"]
 
+# Marketing template format variations (all card-based here):
+#  single   — one media-header card (image/video + body + buttons)
+#  carousel — 2–10 media cards
+#  text     — body + buttons, no media
+WhatsAppFormat = Literal["single", "carousel", "text"]
+
 # Carousel size cap (Meta allows up to 10 cards per media-card carousel template).
 WA_MAX_CARDS = 10
 
 
 class WhatsAppSpec(BaseModel):
-    """WhatsApp Business config: sender (account model), carousel template, light bot."""
+    """WhatsApp Business config: sender (account model), template format, light bot."""
     template_category: Literal["marketing", "utility"] = "marketing"
+    format: WhatsAppFormat = "carousel"
     # Sender / account model under the operator's WABA via the aggregator:
     # shared = the operator's common sender ("AdConnect Promo"); dedicated = the
     # advertiser's own display name, provisioned by the operator (large advertisers).

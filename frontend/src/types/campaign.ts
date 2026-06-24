@@ -92,8 +92,10 @@ export interface WhatsAppCard {
 }
 export type WhatsAppSenderMode = "shared" | "dedicated";
 export type WhatsAppTemplateStatus = "draft" | "pending" | "approved";
+export type WhatsAppFormat = "single" | "carousel" | "text";
 export interface WhatsAppSpec {
   template_category: "marketing" | "utility";
+  format: WhatsAppFormat;
   sender_mode: WhatsAppSenderMode;
   sender_name: string | null;
   cards: WhatsAppCard[];

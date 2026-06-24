@@ -24,6 +24,7 @@ import {
   type MetaFormat,
   type WhatsAppButton,
   type WhatsAppCard,
+  type WhatsAppFormat,
   type WizardStep,
 } from "../types/campaign";
 import { NETWORK_CHANNELS, OPERATOR_CHANNELS, type ChannelCard } from "./channels";
@@ -186,7 +187,7 @@ function stepLabel(step: Exclude<WizardStep, "ready">, channel: Channel | null):
     case "brief": return "Бриф";
     case "channel": return "Канал";
     case "segments": return network || whatsapp ? "Аудитория" : "Сегменты";
-    case "message": return whatsapp ? "Карусель" : network ? "Креатив" : "Сообщение";
+    case "message": return whatsapp || network ? "Креатив" : "Сообщение";
     case "cost": return "Стоимость";
     case "confirmation": return "Подтверждение";
   }
@@ -1219,25 +1220,40 @@ function WhatsAppButtonsEditor({ card, index, api, disabled }: {
   );
 }
 
-function WhatsAppCardEditor({ draft, api, index, disabled, onGen }: {
-  draft: CampaignDraft; api: WizardApi; index: number; disabled?: boolean; onGen: (i: number) => void;
+const WA_FORMAT_ORDER: WhatsAppFormat[] = ["single", "carousel", "text"];
+const WA_FORMAT_META: Record<WhatsAppFormat, { label: string; hint: string }> = {
+  single:   { label: "Одно сообщение", hint: "Картинка/видео + текст + кнопки" },
+  carousel: { label: "Карусель",       hint: "До 10 карточек, листаются" },
+  text:     { label: "Текст + кнопки",  hint: "Сообщение без медиа" },
+};
+
+function WhatsAppCardEditor({ draft, api, index, disabled, onGen, hideMedia, numbered }: {
+  draft: CampaignDraft; api: WizardApi; index: number; disabled?: boolean;
+  onGen: (i: number) => void; hideMedia?: boolean; numbered?: boolean;
 }) {
   const card = draft.whatsapp.cards[index];
+  if (!card) return null;
   return (
     <div className="acw-wa-card">
       <div className="acw-wa-card-head">
-        <span className="acw-wa-card-num">Карточка {index + 1}</span>
-        <button type="button" className="acw-chip-x" disabled={disabled} onClick={() => api.update({ wa_remove_card: index })} aria-label="Удалить карточку">×</button>
+        <span className="acw-wa-card-num">{numbered ? `Карточка ${index + 1}` : "Сообщение"}</span>
+        {numbered && (
+          <button type="button" className="acw-chip-x" disabled={disabled} onClick={() => api.update({ wa_remove_card: index })} aria-label="Удалить карточку">×</button>
+        )}
       </div>
-      <div className="acw-wa-card-media">
-        {card.media_url
-          ? <img src={card.media_url} className="acw-wa-card-img" alt="card" />
-          : <div className="acw-adpreview-empty">1:1</div>}
-      </div>
-      <button type="button" className="acw-btn acw-btn-ghost acw-media-btn" disabled={disabled} onClick={() => onGen(index)}>
-        <IconPhoto />{card.media_url ? "Перегенерировать фото" : "Сгенерировать фото"}
-      </button>
-      <EditableText value={card.body} placeholder="Текст карточки…" multiline disabled={disabled}
+      {!hideMedia && (
+        <>
+          <div className="acw-wa-card-media">
+            {card.media_url
+              ? <img src={card.media_url} className="acw-wa-card-img" alt="card" />
+              : <div className="acw-adpreview-empty">1:1</div>}
+          </div>
+          <button type="button" className="acw-btn acw-btn-ghost acw-media-btn" disabled={disabled} onClick={() => onGen(index)}>
+            <IconPhoto />{card.media_url ? "Перегенерировать фото" : "Сгенерировать фото"}
+          </button>
+        </>
+      )}
+      <EditableText value={card.body} placeholder="Текст сообщения…" multiline disabled={disabled}
         onCommit={(v) => api.update({ wa_card_body: { index, body: v } })} />
       <WhatsAppButtonsEditor card={card} index={index} api={api} disabled={disabled} />
     </div>
@@ -1246,7 +1262,10 @@ function WhatsAppCardEditor({ draft, api, index, disabled, onGen }: {
 
 function WhatsAppPreview({ draft }: { draft: CampaignDraft }) {
   const wa = draft.whatsapp;
+  const format: WhatsAppFormat = wa.format ?? "carousel";
   const sender = wa.sender_mode === "dedicated" ? (wa.sender_name || "Ваш бренд") : "AdConnect Promo";
+  const withMedia = format !== "text";
+  const cards = format === "carousel" ? wa.cards : wa.cards.slice(0, 1);
   return (
     <div className="acw-wa-preview">
       <div className="acw-wa-preview-head">
@@ -1255,15 +1274,15 @@ function WhatsAppPreview({ draft }: { draft: CampaignDraft }) {
         <span className="acw-wa-preview-badge">бот</span>
       </div>
       <div className="acw-wa-preview-body">
-        {wa.cards.length === 0 ? (
-          <div className="acw-hint">Соберите карусель, чтобы увидеть превью сообщения.</div>
+        {cards.length === 0 ? (
+          <div className="acw-hint">Соберите креатив, чтобы увидеть превью сообщения.</div>
         ) : (
-          <div className="acw-wa-preview-carousel">
-            {wa.cards.map((c, i) => (
+          <div className={`acw-wa-preview-carousel${format !== "carousel" ? " single" : ""}`}>
+            {cards.map((c, i) => (
               <div key={i} className="acw-wa-preview-card">
-                {c.media_url
+                {withMedia && (c.media_url
                   ? <img src={c.media_url} className="acw-wa-preview-img" alt="card" />
-                  : <div className="acw-wa-preview-img acw-wa-preview-empty">1:1</div>}
+                  : <div className="acw-wa-preview-img acw-wa-preview-empty">1:1</div>)}
                 {c.body && <div className="acw-wa-preview-text">{c.body}</div>}
                 {c.buttons.map((b, j) => <div key={j} className="acw-wa-preview-btn">{b.label}</div>)}
               </div>
@@ -1281,6 +1300,10 @@ function WhatsAppCreativeStep({ draft, api }: { draft: CampaignDraft; api: Wizar
   const [busy, setBusy] = useState(false);
   const wa = draft.whatsapp;
   const disabled = api.busy || busy;
+  const format: WhatsAppFormat = wa.format ?? "carousel";
+  const isCarousel = format === "carousel";
+  const isText = format === "text";
+  const cards = isCarousel ? wa.cards : wa.cards.slice(0, 1);
 
   const genCardImage = async (index: number) => {
     setBusy(true);
@@ -1290,25 +1313,49 @@ function WhatsAppCreativeStep({ draft, api }: { draft: CampaignDraft; api: Wizar
     } finally { setBusy(false); }
   };
 
-  const buildCarousel = async () => {
+  const generate = async () => {
     setBusy(true);
     try {
       const copy = await generateCopy({ tone });
       const variants = copy?.variants ?? [];
-      const n = Math.max(1, Math.min(3, variants.length || 3));
-      for (let i = 0; i < n; i += 1) {
-        const body = variants[i] ?? null;
-        if (body) await api.update({ wa_card_body: { index: i, body } });
-        await generateCreative({ format: "whatsapp_card", media_type: "image", card_index: i, headline: body });
+      const count = isCarousel ? Math.max(1, Math.min(3, variants.length || 3)) : 1;
+      if (isText) {
+        // No media: ensure `count` cards exist, then fill their copy.
+        for (let i = wa.cards.length; i < count; i += 1) await api.update({ wa_add_card: {} });
+        for (let i = 0; i < count; i += 1) await api.update({ wa_card_body: { index: i, body: variants[i] ?? null } });
+      } else {
+        for (let i = 0; i < count; i += 1) {
+          const body = variants[i] ?? null;
+          if (body) await api.update({ wa_card_body: { index: i, body } });
+          // generate auto-creates the card at index i.
+          await generateCreative({ format: "whatsapp_card", media_type: "image", card_index: i, headline: body });
+        }
       }
     } finally { setBusy(false); }
   };
 
+  const genLabel = isCarousel ? "Собрать карусель" : isText ? "Сгенерировать текст" : "Сгенерировать сообщение";
+
   return (
     <>
-      <div className="acw-objective-pill">Шаблон: <b>маркетинговая карусель</b> · до {WA_MAX_CARDS} карточек</div>
+      <Field label="Формат шаблона" hint="Маркетинговый шаблон проходит согласование в Meta. Выберите вид сообщения.">
+        <div className="acw-formats">
+          {WA_FORMAT_ORDER.map((f) => (
+            <button key={f} type="button" className={`acw-format${format === f ? " on" : ""}`}
+              disabled={disabled} onClick={() => api.update({ wa_format: f })}>
+              <span className="acw-format-label">{WA_FORMAT_META[f].label}</span>
+              <span className="acw-format-hint">{WA_FORMAT_META[f].hint}</span>
+            </button>
+          ))}
+          <button type="button" className="acw-format" disabled title="Требуется каталог товаров Meta">
+            <span className="acw-format-label">Каталог товаров</span>
+            <span className="acw-format-ratio">Скоро</span>
+            <span className="acw-format-hint">Товары из каталога Meta</span>
+          </button>
+        </div>
+      </Field>
 
-      <Field label="Карусель" hint="Каждая карточка — изображение 1:1, текст и до 2 кнопок. Соберите автоматически или отредактируйте вручную.">
+      <Field label="Содержание" hint="Текст и до 2 кнопок на карточку. Соберите автоматически или отредактируйте вручную.">
         <div className="acw-gen-row">
           <div className="acw-tone">
             {TONES.map((t) => (
@@ -1316,18 +1363,24 @@ function WhatsAppCreativeStep({ draft, api }: { draft: CampaignDraft; api: Wizar
                 disabled={disabled} onClick={() => setTone(t.id)}>{t.label}</button>
             ))}
           </div>
-          <button type="button" className="acw-btn acw-btn-primary acw-gen-btn" disabled={disabled} onClick={buildCarousel}>
-            {busy ? <Spinner /> : "✦"} Собрать карусель
+          <button type="button" className="acw-btn acw-btn-primary acw-gen-btn" disabled={disabled} onClick={generate}>
+            {busy ? <Spinner /> : "✦"} {genLabel}
           </button>
         </div>
 
-        <div className="acw-wa-cards">
-          {wa.cards.map((_, i) => (
-            <WhatsAppCardEditor key={i} draft={draft} api={api} index={i} disabled={disabled} onGen={genCardImage} />
+        <div className={`acw-wa-cards${isCarousel ? "" : " single"}`}>
+          {cards.map((_, i) => (
+            <WhatsAppCardEditor key={i} draft={draft} api={api} index={i} disabled={disabled}
+              onGen={genCardImage} hideMedia={isText} numbered={isCarousel} />
           ))}
-          {wa.cards.length < WA_MAX_CARDS && (
+          {isCarousel && wa.cards.length < WA_MAX_CARDS && (
             <button type="button" className="acw-wa-add-card" disabled={disabled} onClick={() => api.update({ wa_add_card: {} })}>
               ＋ Добавить карточку
+            </button>
+          )}
+          {!isCarousel && wa.cards.length === 0 && (
+            <button type="button" className="acw-wa-add-card" disabled={disabled} onClick={() => api.update({ wa_add_card: {} })}>
+              ＋ Создать сообщение
             </button>
           )}
         </div>
@@ -1476,9 +1529,10 @@ function ConfirmationStep({ draft }: { draft: CampaignDraft }) {
     rows.push(["Ожидаемые показы", fmt(draft.estimated_impressions)]);
   } else if (whatsapp) {
     const wa = draft.whatsapp;
+    const waFormat: WhatsAppFormat = wa.format ?? "carousel";
     rows.push(["Отправитель", wa.sender_mode === "dedicated" ? (wa.sender_name || "Выделенный") : "AdConnect Promo (общий)"]);
-    rows.push(["Шаблон", "Маркетинговая карусель"]);
-    rows.push(["Карточек", String(wa.cards.length)]);
+    rows.push(["Формат", WA_FORMAT_META[waFormat].label]);
+    if (waFormat === "carousel") rows.push(["Карточек", String(wa.cards.length)]);
     rows.push(["Автоответы бота", wa.auto_reply_enabled ? "Включены" : "Нет"]);
     rows.push(["Достижимо в WhatsApp", fmt(draft.audience_reach)]);
     rows.push(["Цена за диалог", `${draft.price_per_message} ₽`]);
@@ -1508,7 +1562,7 @@ function ConfirmationStep({ draft }: { draft: CampaignDraft }) {
         </Field>
       )}
       {whatsapp && draft.whatsapp.cards.length > 0 && (
-        <Field label="Карусель">
+        <Field label="Креатив">
           <WhatsAppPreview draft={draft} />
         </Field>
       )}

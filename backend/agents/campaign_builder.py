@@ -106,6 +106,9 @@ _FORMAT_LABEL = {"feed": "Лента", "stories": "Истории", "reels": "Re
 _FORMAT_DEFAULT_MEDIA = {"feed": "image", "stories": "image", "reels": "video", "whatsapp": "image"}
 _FORMAT_ORDER = ("feed", "stories", "reels", "whatsapp")
 
+# WhatsApp Business marketing template formats.
+_WA_FORMAT_LABEL = {"single": "одно сообщение", "carousel": "карусель", "text": "текст + кнопки"}
+
 
 def _effective_placements(draft: CampaignDraft) -> list[str]:
     """Placements that ads actually run on (all of them under Advantage+ placements)."""
@@ -293,32 +296,40 @@ async def _generate_creatives(ctx: AgentContext, draft: CampaignDraft) -> AgentR
 
 
 async def _generate_wa_carousel(ctx: AgentContext, draft: CampaignDraft, *, n: int = 3) -> AgentResult:
-    """Assemble a WhatsApp Business carousel: copy variants → cards with images."""
+    """Assemble a WhatsApp Business creative for the chosen format: copy → cards.
+
+    `carousel` builds up to `n` cards with images; `single` one card with an image;
+    `text` one card with copy and no media.
+    """
     draft.channel = "whatsapp"
+    fmt = draft.whatsapp.format
+    count = n if fmt == "carousel" else 1
+    with_media = fmt != "text"
     variants = await creatives_tool.generate_creatives(**await _copy_context(ctx, draft))
     draft.message.variants = variants                      # keep the pool for the canvas
     cards: list[WhatsAppCard] = []
-    for i, body in enumerate(variants[:n]):
+    for i, body in enumerate(variants[:count]):
         url = creative_gen.save_generated(
             fmt="whatsapp_card", media_type="image", headline=body, brand=draft.product, seed=i,
-        )
+        ) if with_media else None
         cards.append(WhatsAppCard(
-            media_type="image", media_url=url, media_source="generated", body=body,
+            media_type="image" if with_media else "none", media_url=url,
+            media_source="generated" if with_media else None, body=body,
             buttons=[WhatsAppButton(type="quick_reply", label="Подробнее")],
         ))
     draft.whatsapp.cards = cards
-    await ctx.emit("tool_called", detail=f"generate_wa_carousel → {len(cards)} card(s)")
+    await ctx.emit("tool_called", detail=f"generate_wa_creative({fmt}) → {len(cards)} card(s)")
 
-    lines = [f"Собрал карусель из **{len(cards)}** карточек для WhatsApp Business:\n"]
+    label = _WA_FORMAT_LABEL.get(fmt, "креатив")
+    lines = [f"Собрал креатив для WhatsApp Business (**{label}**) — {len(cards)} карточк(а/и):\n"]
     for i, c in enumerate(cards):
         lines.append(f"{i + 1}. {c.body}")
     lines.append(
-        "\nКаждая карточка — изображение, текст и кнопка. Отредактируйте на холсте "
-        "(текст, медиа, кнопки, число карточек) или перегенерируйте."
+        "\nОтредактируйте на холсте (формат, текст, медиа, кнопки, число карточек) или перегенерируйте."
     )
     apply_forecast(draft)
     return _wrap(draft, "\n".join(lines), [
-        ChatAction(id="generate_wa_carousel", label="Перегенерировать карусель", kind="default", payload={}),
+        ChatAction(id="generate_wa_carousel", label="Перегенерировать креатив", kind="default", payload={}),
         ChatAction(id="generate_creatives", label="Сгенерировать только тексты", kind="default", payload={}),
     ], substep="message")
 
@@ -581,13 +592,15 @@ def _ask_message(draft: CampaignDraft) -> AgentResult:
             f"достижимая аудитория ≈ **{reach}**, цена **{draft.price_per_message:.0f} ₽** за диалог "
             f"(открытие чата; дальнейшая переписка с ботом — бесплатно)"
         )
+        fmt_label = _WA_FORMAT_LABEL.get(draft.whatsapp.format, "карусель")
         msg = (
             f"Аудитория готова: {price_line}.\n\n"
-            f"Теперь **карусель** — до 10 карточек, у каждой изображение, текст и кнопка. "
+            f"Теперь **креатив**. Текущий формат — «**{fmt_label}**» (на холсте можно выбрать: "
+            f"одно сообщение, карусель до 10 карточек, текст + кнопки). "
             f"Соберу тексты и картинки под вашу цель, либо отредактируйте всё на холсте."
         )
         actions = [
-            ChatAction(id="generate_wa_carousel", label="Собрать карусель", kind="primary", payload={}),
+            ChatAction(id="generate_wa_carousel", label="Собрать креатив", kind="primary", payload={}),
             ChatAction(id="generate_creatives", label="Сгенерировать тексты", kind="default", payload={}),
         ]
         return _wrap(draft, msg, actions, substep="message")
@@ -669,7 +682,7 @@ def _summary(draft: CampaignDraft) -> str:
     network = is_network_channel(draft.channel)
     whatsapp = draft.channel == "whatsapp"
     if whatsapp:
-        creative_row = f"- **Карусель**: {len(draft.whatsapp.cards)} карточек"
+        creative_row = f"- **Креатив**: {_WA_FORMAT_LABEL.get(draft.whatsapp.format, 'карусель')}"
     else:
         creative_row = f"- **{'Объявление' if network else 'Сообщение'}**: {draft.message.text or '—'}"
     rows = [
@@ -687,7 +700,7 @@ def _summary(draft: CampaignDraft) -> str:
             else (wa.sender_name or "выделенный отправитель")
         rows += [
             f"- **Отправитель**: {sender}",
-            f"- **Категория шаблона**: {wa.template_category}",
+            f"- **Карточек**: {len(wa.cards)}",
             f"- **Автоответы бота**: {'включены' if wa.auto_reply_enabled else 'нет'}",
             f"- **Достижимая аудитория**: ≈ {reach}",
             f"- **Цена за диалог**: {draft.price_per_message:.0f} ₽",

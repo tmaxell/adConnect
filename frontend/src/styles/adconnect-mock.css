@@ -592,6 +592,8 @@ button.ac-side-item {
 
 /* ── WhatsApp Business carousel step ───────────────────────────────────────────── */
 .acw-wa-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-top: 10px; }
+.acw-wa-cards.single { grid-template-columns: minmax(0, 320px); }
+.acw-wa-preview-carousel.single .acw-wa-preview-card { flex: 0 0 230px; }
 .acw-wa-card { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--ac-border); border-radius: 10px; padding: 10px; background: var(--ac-surface); }
 .acw-wa-card-head { display: flex; align-items: center; justify-content: space-between; }
 .acw-wa-card-num { font-size: 12px; font-weight: 700; color: var(--ac-text-secondary); }
