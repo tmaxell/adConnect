@@ -676,12 +676,18 @@ function AudiencePicker({ draft, api }: { draft: CampaignDraft; api: WizardApi }
   const [open, setOpen] = useState(false);
   const active = draft.segments.matched_segment_name;
   return (
-    <Field label="Готовая аудитория" hint="Выберите аудиторию из реестра — ранее сохранённую или готовый сегмент оператора; параметры подставятся автоматически.">
+    <Field label="Готовая аудитория из реестра (необязательно)" hint="Необязательный шаг: подставит параметры готового сегмента или сохранённой аудитории — их можно отредактировать ниже. Либо соберите аудиторию вручную в полях ниже.">
       <div className="acw-aud-pick">
         {active && <span className="acw-chip acw-chip-accent">{active}</span>}
         <button type="button" className="acw-btn acw-btn-ghost" disabled={api.busy} onClick={() => setOpen(true)}>
-          {active ? "Сменить аудиторию" : "Выбрать готовую аудиторию"}
+          {active ? "Сменить аудиторию" : "Выбрать из реестра"}
         </button>
+        {active && (
+          <button type="button" className="acw-btn acw-btn-ghost" disabled={api.busy}
+            onClick={() => api.update({ matched_segment_id: "", matched_segment_name: "" })}>
+            Очистить
+          </button>
+        )}
       </div>
       {open && <AudienceRegistryModal draft={draft} api={api} onClose={() => setOpen(false)} />}
     </Field>
@@ -1041,6 +1047,10 @@ function SegmentsStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) 
       : <OperatorSegmentsStep draft={draft} api={api} />;
   return (
     <>
+      <div className="acw-brief-intro">
+        Соберите свою аудиторию вручную — задайте гео, демографию, интересы и доп. параметры в полях ниже.
+        Реестр готовых аудиторий — необязательный быстрый старт.
+      </div>
       {content}
       <div className="acw-aud-savebar"><SaveAudienceButton draft={draft} api={api} /></div>
     </>
@@ -1409,21 +1419,27 @@ function WhatsAppCreativeStep({ draft, api }: { draft: CampaignDraft; api: Wizar
           </button>
         </div>
 
-        <div className={`acw-wa-cards${isCarousel ? "" : " single"}`}>
-          {cards.map((_, i) => (
-            <WhatsAppCardEditor key={i} draft={draft} api={api} index={i} disabled={disabled}
-              onGen={genCardImage} hideMedia={isText} numbered={isCarousel} />
-          ))}
-          {isCarousel && wa.cards.length < WA_MAX_CARDS && (
-            <button type="button" className="acw-wa-add-card" disabled={disabled} onClick={() => api.update({ wa_add_card: {} })}>
-              ＋ Добавить карточку
-            </button>
-          )}
-          {!isCarousel && wa.cards.length === 0 && (
-            <button type="button" className="acw-wa-add-card" disabled={disabled} onClick={() => api.update({ wa_add_card: {} })}>
-              ＋ Создать сообщение
-            </button>
-          )}
+        <div className={`acw-wa-build${isCarousel ? " carousel" : ""}`}>
+          <div className={`acw-wa-cards${isCarousel ? "" : " single"}`}>
+            {cards.map((_, i) => (
+              <WhatsAppCardEditor key={i} draft={draft} api={api} index={i} disabled={disabled}
+                onGen={genCardImage} hideMedia={isText} numbered={isCarousel} />
+            ))}
+            {isCarousel && wa.cards.length < WA_MAX_CARDS && (
+              <button type="button" className="acw-wa-add-card" disabled={disabled} onClick={() => api.update({ wa_add_card: {} })}>
+                ＋ Добавить карточку
+              </button>
+            )}
+            {!isCarousel && wa.cards.length === 0 && (
+              <button type="button" className="acw-wa-add-card" disabled={disabled} onClick={() => api.update({ wa_add_card: {} })}>
+                ＋ Создать сообщение
+              </button>
+            )}
+          </div>
+          <div className="acw-wa-preview-wrap">
+            <div className="acw-wa-preview-cap">Превью</div>
+            <WhatsAppPreview draft={draft} />
+          </div>
         </div>
       </Field>
 
@@ -1440,8 +1456,6 @@ function WhatsAppCreativeStep({ draft, api }: { draft: CampaignDraft; api: Wizar
           </div>
         )}
       </Field>
-
-      <WhatsAppPreview draft={draft} />
     </>
   );
 }
@@ -1623,7 +1637,7 @@ function ConfirmationStep({ draft }: { draft: CampaignDraft }) {
 // ── Main ─────────────────────────────────────────────────────────────────────────
 
 export function CampaignWizard({ draft }: { draft: CampaignDraft }) {
-  const { updateDraft, sendMessage, sending, draftRev } = useChatWorkspaceStore();
+  const { updateDraft, sendMessage, sending, draftRev, stopCreating } = useChatWorkspaceStore();
   const reached = activeStep(draft);
   const submitted = draft.status === "submitted";
 
@@ -1659,7 +1673,10 @@ export function CampaignWizard({ draft }: { draft: CampaignDraft }) {
   return (
     <div className="acw">
       <div className="acw-titlebar">
-        <span>{submitted ? draft.name || "Рекламная кампания" : "Создание рекламной кампании"}</span>
+        <span className="acw-titlebar-left">
+          <button type="button" className="acw-back" onClick={stopCreating}>← К кампаниям</button>
+          <span>{submitted ? draft.name || "Рекламная кампания" : "Создание рекламной кампании"}</span>
+        </span>
         <span className="acw-titlebar-actions">⧉ 🗑</span>
       </div>
 

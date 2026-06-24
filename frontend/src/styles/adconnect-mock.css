@@ -326,6 +326,9 @@ button.ac-side-item {
   font-weight: 600;
 }
 .acw-titlebar-actions { color: var(--ac-text-muted); font-size: 16px; letter-spacing: 6px; }
+.acw-titlebar-left { display: flex; align-items: center; gap: 14px; }
+.acw-back { border: 1px solid var(--ac-border); background: var(--ac-surface); cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: var(--ac-accent); padding: 6px 12px; border-radius: 8px; }
+.acw-back:hover { background: var(--ac-accent-soft); border-color: var(--ac-accent); }
 
 /* Type card + step bar */
 .acw-typecard {
@@ -592,8 +595,17 @@ button.ac-side-item {
 
 /* ── WhatsApp Business carousel step ───────────────────────────────────────────── */
 .acw-wa-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-top: 10px; }
-.acw-wa-cards.single { grid-template-columns: minmax(0, 320px); }
-.acw-wa-preview-carousel.single .acw-wa-preview-card { flex: 0 0 230px; }
+.acw-wa-cards.single { grid-template-columns: minmax(0, 1fr); }
+.acw-wa-preview-carousel.single .acw-wa-preview-card { flex: 1 1 auto; }
+
+/* Editor + live preview side by side (single/text); stacked for carousel */
+.acw-wa-build { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; margin-top: 10px; }
+.acw-wa-build.carousel { display: block; }
+.acw-wa-build .acw-wa-cards { margin-top: 0; }
+.acw-wa-preview-wrap { display: flex; flex-direction: column; gap: 6px; position: sticky; top: 8px; }
+.acw-wa-build.carousel .acw-wa-preview-wrap { margin-top: 14px; max-width: 320px; }
+.acw-wa-preview-cap { font-size: 12px; font-weight: 600; color: var(--ac-text-secondary); }
+@media (max-width: 900px) { .acw-wa-build { grid-template-columns: 1fr; } }
 .acw-wa-card { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--ac-border); border-radius: 10px; padding: 10px; background: var(--ac-surface); }
 .acw-wa-card-head { display: flex; align-items: center; justify-content: space-between; }
 .acw-wa-card-num { font-size: 12px; font-weight: 700; color: var(--ac-text-secondary); }
@@ -613,7 +625,7 @@ button.ac-side-item {
 .acw-wa-add-btn { align-self: flex-start; font-size: 12px; padding: 5px 10px; }
 
 /* WhatsApp message preview (operator bot bubble + horizontal carousel) */
-.acw-wa-preview { border: 1px solid var(--ac-border); border-radius: 12px; overflow: hidden; background: #e8f5e9; margin-top: 12px; }
+.acw-wa-preview { border: 1px solid var(--ac-border); border-radius: 12px; overflow: hidden; background: #e8f5e9; }
 .acw-wa-preview-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #075E54; color: #fff; }
 .acw-wa-preview-avatar { width: 26px; height: 26px; border-radius: 50%; background: #25D366; flex-shrink: 0; }
 .acw-wa-preview-name { font-size: 13px; font-weight: 600; }

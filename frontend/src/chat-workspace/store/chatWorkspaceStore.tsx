@@ -38,6 +38,10 @@ interface ChatWorkspaceState {
   view: "campaigns" | "analytics" | "profile" | "audiences";
   analyticsCampaignId: number | null;
   setView: (view: "campaigns" | "analytics" | "profile" | "audiences", campaignId?: number | null) => void;
+  /** True while the campaign create flow (wizard) is open over the campaigns list. */
+  creating: boolean;
+  startCreating: () => Promise<void>;
+  stopCreating: () => void;
   loadingSessions: boolean;
   loadingMessages: boolean;
   sending: boolean;
@@ -124,11 +128,13 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
   const [draftRev, setDraftRev] = useState(0);
   const [view, setViewState] = useState<"campaigns" | "analytics" | "profile" | "audiences">("campaigns");
   const [analyticsCampaignId, setAnalyticsCampaignId] = useState<number | null>(null);
+  const [creating, setCreating] = useState(false);
   const userActedRef = useRef(false);
   const bumpDraft = useCallback(() => setDraftRev((r) => r + 1), []);
   const setView = useCallback((v: "campaigns" | "analytics" | "profile" | "audiences", campaignId: number | null = null) => {
     setViewState(v);
     setAnalyticsCampaignId(campaignId);
+    setCreating(false);            // navigating via the sidebar always leaves the create flow
   }, []);
 
   const refreshSessions = useCallback(async (silent = false) => {
@@ -265,6 +271,8 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
           setMessages(detail.messages.map((m) => ({ ...m })));
           setArtifacts(detail.artifacts);
           bumpDraft();
+          // The Copilot just produced/updated a campaign → open the create flow.
+          if (detail.artifacts.some((a) => a.type === "campaign_draft")) setCreating(true);
         } catch {
           // если перезагрузка не удалась — оставляем оптимистичный state
         }
@@ -308,6 +316,15 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
     },
     [activeSessionId, createNewChat, mergeDraftArtifact],
   );
+
+  // Enter the create flow (wizard) over the campaigns list; ensures a draft exists.
+  const startCreating = useCallback(async () => {
+    setViewState("campaigns");
+    setAnalyticsCampaignId(null);
+    await updateDraft({});
+    setCreating(true);
+  }, [updateDraft]);
+  const stopCreating = useCallback(() => setCreating(false), []);
 
   const generateCreativeAction = useCallback(
     async (params: { format: MetaFormat | "whatsapp_card"; media_type: MediaType; headline?: string | null; prompt?: string | null; card_index?: number | null }) => {
@@ -381,6 +398,9 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
       view,
       analyticsCampaignId,
       setView,
+      creating,
+      startCreating,
+      stopCreating,
       loadingSessions,
       loadingMessages,
       sending,
@@ -405,6 +425,9 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
       view,
       analyticsCampaignId,
       setView,
+      creating,
+      startCreating,
+      stopCreating,
       loadingSessions,
       loadingMessages,
       sending,

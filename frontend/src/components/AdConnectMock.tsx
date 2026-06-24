@@ -321,7 +321,7 @@ function AdcCampaignsScreen() {
     return () => { cancelled = true; };
   }, []);
 
-  const { updateDraft } = useChatWorkspaceStore();
+  const { startCreating } = useChatWorkspaceStore();
   const list = rows ?? CAMPAIGNS;
   return (
     <div className="ac-card">
@@ -333,7 +333,7 @@ function AdcCampaignsScreen() {
               You can create an advertising campaign, view existing ones with their data, or delete them
             </p>
           </div>
-          <button type="button" className="ac-create-btn" onClick={() => void updateDraft({})}>
+          <button type="button" className="ac-create-btn" onClick={() => void startCreating()}>
             + Создать кампанию
           </button>
         </div>
@@ -369,7 +369,7 @@ function AdcCampaignsScreen() {
 // ── Shell ──────────────────────────────────────────────────────────────────────
 
 export function AdConnectMock() {
-  const { campaignDraft, view } = useChatWorkspaceStore();
+  const { campaignDraft, view, creating } = useChatWorkspaceStore();
   return (
     <div className="ac-shell">
       <AdcTopbar />
@@ -382,7 +382,7 @@ export function AdConnectMock() {
             ? <ProfilePage />
             : view === "audiences"
             ? <AudiencesPage />
-            : campaignDraft ? <CampaignWizard draft={campaignDraft} /> : <AdcCampaignsScreen />}
+            : creating && campaignDraft ? <CampaignWizard draft={campaignDraft} /> : <AdcCampaignsScreen />}
         </main>
       </div>
     </div>
