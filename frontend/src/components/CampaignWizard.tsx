@@ -1624,7 +1624,7 @@ function ConfirmationStep({ draft }: { draft: CampaignDraft }) {
       <Field label="Название кампании">
         <div className="acw-input-mock">{draft.name || <span className="acw-placeholder">Название</span>}</div>
       </Field>
-      {draft.message.text && (
+      {!whatsapp && draft.message.text && (
         <Field label="Сообщение"><div className="acw-textarea-mock">{draft.message.text}</div></Field>
       )}
       {draft.status === "submitted" && (

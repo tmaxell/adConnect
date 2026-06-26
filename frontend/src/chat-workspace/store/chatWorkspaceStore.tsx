@@ -317,13 +317,20 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
     [activeSessionId, createNewChat, mergeDraftArtifact],
   );
 
-  // Enter the create flow (wizard) over the campaigns list; ensures a draft exists.
+  // Enter the create flow (wizard) over the campaigns list. Always start a FRESH
+  // session so a new campaign never reopens a previously submitted draft.
   const startCreating = useCallback(async () => {
     setViewState("campaigns");
     setAnalyticsCampaignId(null);
-    await updateDraft({});
+    try {
+      const id = await createNewChat();        // new session → cleared artifacts
+      const draft = await patchDraft(id, {});  // materialize an empty draft in THIS session
+      mergeDraftArtifact(draft);
+    } catch (e) {
+      setError(toError(e));
+    }
     setCreating(true);
-  }, [updateDraft]);
+  }, [createNewChat, mergeDraftArtifact]);
   const stopCreating = useCallback(() => setCreating(false), []);
 
   const generateCreativeAction = useCallback(
