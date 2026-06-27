@@ -1,87 +1,227 @@
-# Eastwind AdConnect — AI features prototype
+# Eastwind AdConnect
 
-Prototype of the AdConnect AI features: a floating chat widget over the product UI,
-backed by a multi-agent system whose flagship **campaign-builder agent** assembles a
-full advertising campaign from a natural-language request (brief & objective →
-channel → audience → creatives → budget → confirmation). A reusable **business
-profile** pre-fills each brief; audiences can be **saved and reused**; the operator
-audience supports extended telecom filters (tariff, ARPU, device, triggers…); and
-offers/creatives are generated from the full context (product, company, offer,
-objective, audience). A second **analyst agent** reports campaign
-performance and recommends fixes — the same data powers the **Analytics** page and
-the Copilot reports (one backend source, `tools/analytics.py`).
+**Eastwind AdConnect** — прототип рекламного кабинета с AI‑копилотом для малого и среднего бизнеса. Система помогает собрать рекламную кампанию из обычного текстового запроса: уточняет бриф, выбирает канал, предлагает аудиторию, генерирует сообщения и креативы, считает прогноз бюджета и показывает аналитику по кампаниям.
 
+Проект состоит из React/Vite‑фронтенда и FastAPI‑бэкенда с мультиагентной логикой. Без ключей LLM приложение работает в детерминированном режиме, поэтому его можно запустить и протестировать локально сразу после клонирования.
+
+## Содержание
+
+- [Возможности](#возможности)
+- [Архитектура](#архитектура)
+- [Технологический стек](#технологический-стек)
+- [Быстрый старт](#быстрый-старт)
+- [Локальная разработка](#локальная-разработка)
+- [Настройка LLM и базы данных](#настройка-llm-и-базы-данных)
+- [Проверки и тесты](#проверки-и-тесты)
+- [Полезные сценарии для демо](#полезные-сценарии-для-демо)
+- [Структура репозитория](#структура-репозитория)
+- [Документация](#документация)
+
+## Возможности
+
+- **AI‑копилот в рекламном кабинете**: плавающий чат‑виджет ведёт пользователя по созданию кампании и синхронизируется с визуальным мастером.
+- **Campaign Builder Agent**: мультишаговый агент собирает черновик кампании: цель, продукт, канал, сегменты, сообщение, креативы, бюджет и подтверждение.
+- **Human‑in‑the‑loop**: агент не запускает кампанию и не тратит бюджет без явного подтверждения пользователя.
+- **Переиспользуемые аудитории**: можно сохранять аудитории и использовать операторские пресеты сегментов.
+- **Каналы коммуникации**: SMS, Email, WhatsApp Business и Meta‑размещения с отдельными параметрами креативов.
+- **Генерация креативов и текстов**: бэкенд умеет генерировать варианты рекламных сообщений и mock‑визуалы для превью.
+- **Аналитика**: общий источник метрик для страницы статистики и отчётов копилота, включая KPI, тренды, разбивку по платформам и рекомендации.
+- **Детерминированный режим**: при отсутствии LLM‑ключей доступны fallback‑сценарии для офлайн‑демо и тестов.
+
+## Архитектура
+
+```text
+frontend/   Vite + React + TypeScript: UI рекламного кабинета, мастер кампаний, AI‑виджет
+backend/    FastAPI: API, мультиагентный supervisor, хранилище, аналитика, генерация
+backend/tools/  Каталоги, прогноз, аналитика, draft‑операции, генерация текстов/креативов
+docs/       Продуктовые заметки, планы интеграций и исследования
 ```
-frontend/   Vite + React widget + AdConnect product canvas (live campaign wizard)
-backend/    FastAPI multi-agent backend (supervisor → agents, /api/chat)
-docs/        product & integration analysis
-screens/     Figma screen exports
-```
 
-## Run with Docker (full stack)
+Основной пользовательский поток:
+
+1. Пользователь пишет запрос в AI‑виджет или кликает по шагам мастера.
+2. Фронтенд отправляет сообщение или действие в `/api/chat` и draft‑эндпоинты.
+3. Supervisor на бэкенде маршрутизирует запрос к нужному агенту.
+4. Campaign Builder обновляет `campaign_draft` — единый контракт, который отображает фронтенд.
+5. Пользователь проверяет расчёт, креативы и подтверждает кампанию вручную.
+
+## Технологический стек
+
+### Backend
+
+- Python, FastAPI, Pydantic, SQLAlchemy Async.
+- SQLite по умолчанию, опционально PostgreSQL через `DATABASE_URL`.
+- LangChain‑совместимые LLM‑провайдеры: Gemini, Groq, GigaChat, Ollama, Anthropic.
+- Pytest для модульных тестов.
+
+### Frontend
+
+- React 18, TypeScript, Vite.
+- React Router, TanStack Query, TanStack Virtual.
+- Tailwind/PostCSS и CSS‑модули проекта.
+- Nginx‑контейнер для production‑сборки фронтенда.
+
+### Инфраструктура
+
+- Docker Compose для запуска полного стека.
+- Volume `adconnect-data` для данных бэкенда в Docker.
+- Проксирование `/api` с фронтенда на backend.
+
+## Быстрый старт
+
+Самый простой способ поднять весь проект — Docker Compose.
+
+### Требования
+
+- Docker и Docker Compose v2.
+- Свободные порты `8080` и `8000`.
+
+### Запуск
 
 ```bash
 docker compose up --build
-# open http://localhost:8080   (frontend; /api is proxied to the backend)
 ```
 
-The backend runs in **deterministic mode** without an LLM key. To enable the LLM,
-create `backend/.env` from `backend/.env.example` and add a provider key — compose
-loads it automatically.
+После старта откройте:
 
-> **After changing code, always rebuild** — `docker compose up -d` (without
-> `--build`) reuses the existing images, so the UI/API can look stale:
-> ```bash
-> docker compose up -d --build            # rebuild both
-> docker compose up -d --build frontend   # rebuild just the frontend
-> ```
-> Asset filenames are content-hashed, so a normal browser refresh of
-> `http://localhost:8080` picks up the new build (no hard-reload needed).
+- UI: <http://localhost:8080>
+- Backend healthcheck: <http://localhost:8000/api/health>
 
-## Run locally (dev)
+> Ключи LLM для быстрого старта не обязательны. Если `backend/.env` отсутствует или ключи не заполнены, приложение использует детерминированные fallback‑сценарии.
+
+### Пересборка после изменений
+
+Docker переиспользует уже собранные образы, поэтому после изменения кода запускайте пересборку:
 
 ```bash
-# backend
-cd backend && python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt && uvicorn app:app --reload --port 8000
-
-# frontend (separate shell)
-cd frontend && npm install && npm run dev   # http://localhost:5173 (proxies /api → :8000)
+docker compose up -d --build
 ```
 
-## Test
+Для пересборки только фронтенда:
 
 ```bash
-cd backend && source .venv/bin/activate && pytest    # 63 tests
+docker compose up -d --build frontend
 ```
 
-## Try it (SMB scenarios)
+## Локальная разработка
 
-The agent is tuned for general small-business advertisers. Example prompts:
+### 1. Backend
 
-- "Создай SMS-кампанию для моего фитнес-клуба, чтобы привлечь новых клиентов"
-- "Подбери аудиторию для службы доставки готовой еды"
-- "Собери кампанию по продвижению автосервиса"
-- "Покажи отчёт по кампаниям" / "Как идёт кампания …? что улучшить?"
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn app:app --reload --port 8000
+```
 
-As you converse, the product canvas fills the campaign wizard live, step by step.
+Backend будет доступен на <http://localhost:8000>. Проверка состояния:
 
-The canvas is also **fully clickable** — you can build a campaign without the copilot:
-pick a channel, toggle placements, edit the audience, and on the Meta **creative**
-step choose a placement format (Лента / Истории / Reels / Click-to-WhatsApp) and
-generate or upload an image/video, with a live ad preview. The canvas and the agent
-edit the same draft. See `docs/creative_generation_and_backend.md` for the Meta
-creative-API research, the interactive endpoints, and the production-scaling sketch.
+```bash
+curl http://localhost:8000/api/health
+```
 
-Operator channels are **SMS**, **Email** and **WhatsApp Business** — a carousel
-broadcast through a BSP aggregator (Woztell-style) under the operator's account,
-priced per opened dialog with the operator bot continuing the chat for free. It has
-its own creative step (a carousel of up to 10 cards) built by analogy with Meta; see
-`docs/whatsapp_channel_plan.md`.
+### 2. Frontend
 
-The **Statistics** screen is an analytics dashboard: account-level KPIs (spend,
-impressions, CTR, results, cost per result), a 14-day trend chart, a per-platform
-split and a per-campaign table; drill into a campaign for its metrics, ROAS and
-recommendations, with a button to get Copilot's fix suggestions. The metrics follow
-Meta's Insights set and are derived deterministically from the stored campaigns by
-`tools/analytics.py` — the single source shared by the page and the chat reports.
+В отдельном терминале:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend будет доступен на <http://localhost:5173>. Vite проксирует `/api` на backend `:8000`.
+
+## Настройка LLM и базы данных
+
+Создайте локальный файл окружения:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+`backend/.env` не должен попадать в Git. Основные параметры:
+
+| Переменная | Назначение |
+| --- | --- |
+| `LLM_PROVIDER` | Провайдер LLM: `groq`, `gemini`, `gigachat`, `ollama`, `anthropic`. |
+| `GOOGLE_API_KEY`, `GROQ_API_KEY`, `GIGACHAT_AUTH_KEY`, `ANTHROPIC_API_KEY` | Ключи соответствующих провайдеров. |
+| `OLLAMA_BASE_URL`, `OLLAMA_MODEL` | Настройки локального Ollama. |
+| `DATABASE_URL` | SQLAlchemy URL для PostgreSQL; если пусто, используется SQLite. |
+
+По умолчанию бэкенд хранит данные в `backend/data/adconnect_agents.sqlite3`. В Docker данные сохраняются в volume `adconnect-data`.
+
+## Проверки и тесты
+
+### Backend tests
+
+```bash
+cd backend
+source .venv/bin/activate
+PYTHONPATH=. pytest
+```
+
+### Frontend production build
+
+```bash
+cd frontend
+npm run build
+```
+
+Рекомендуемый минимальный набор перед отправкой изменений:
+
+```bash
+cd backend && PYTHONPATH=. pytest
+cd ../frontend && npm run build
+```
+
+## Полезные сценарии для демо
+
+Попробуйте в AI‑виджете:
+
+- `Создай SMS-кампанию для моего фитнес-клуба, чтобы привлечь новых клиентов`
+- `Подбери аудиторию для службы доставки готовой еды`
+- `Собери кампанию по продвижению автосервиса`
+- `Сделай WhatsApp-кампанию с каруселью для новой акции`
+- `Покажи отчёт по кампаниям`
+- `Как идёт кампания и что улучшить?`
+
+Во время диалога мастер кампании заполняется по шагам. Те же поля можно менять кликами в интерфейсе: чат и canvas работают с одним draft‑артефактом.
+
+## Структура репозитория
+
+```text
+.
+├── backend/
+│   ├── agents/        # supervisor и специализированные агенты
+│   ├── tools/         # аналитика, прогноз, каталоги, генерация, операции с draft
+│   ├── tests/         # pytest-тесты backend-логики
+│   ├── app.py         # FastAPI-приложение и API-эндпоинты
+│   ├── db.py          # SQLAlchemy async-хранилище
+│   └── schemas.py     # Pydantic-контракты API и campaign_draft
+├── frontend/
+│   ├── src/components/ # UI рекламного кабинета, виджет, страницы
+│   ├── src/api/        # API-клиент чата
+│   └── src/types/      # TypeScript-типы контрактов
+├── docs/               # исследования, планы интеграций, демо-сценарии
+├── docker-compose.yml  # полный стек backend + frontend
+└── README.md
+```
+
+## Документация
+
+- `backend/README.md` — детали мультиагентного backend.
+- `frontend/README.md` — детали frontend‑прототипа и AI‑виджета.
+- `docs/creative_generation_and_backend.md` — подход к генерации креативов и backend‑эндпоинтам.
+- `docs/whatsapp_channel_plan.md` — план WhatsApp Business‑канала.
+- `docs/meta_integration_concept.md` — концепция интеграции Meta.
+- `docs/demo_script.md` — сценарий демонстрации.
+
+## Практические замечания
+
+- Не коммитьте `.env`, ключи API и локальные базы данных.
+- После изменения Docker‑сборок используйте `docker compose up -d --build`.
+- Если UI выглядит устаревшим, сначала проверьте, что контейнеры пересобраны.
+- Для production‑сценариев используйте PostgreSQL вместо локального SQLite и настройте секреты через окружение/секрет‑хранилище.
