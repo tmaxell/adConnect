@@ -73,6 +73,42 @@ def _preview(text_content: str, limit: int = 200) -> str:
     return " ".join(text_content.split())[:limit]
 
 
+# A couple of demo campaigns seeded into the DB on a fresh install, so the
+# campaigns list (and analytics) is never completely empty. They are full
+# CampaignDraft snapshots so the analytics detail view works on them too.
+_DEMO_CAMPAIGNS: tuple[dict[str, Any], ...] = (
+    {
+        "name": "Фитнес-клуб «Энергия» — заявки",
+        "goal": "привлечь заявки на пробную тренировку",
+        "product": "фитнес-клуб", "company": "Энергия",
+        "channel": "meta",
+        "segments": {"geography": ["Москва"], "demographics": "all", "age": ["25-34", "35-44"],
+                     "interests": ["sport"], "audience_confirmed": True,
+                     "matched_segment_name": "Активные молодые"},
+        "meta": {"objective": "leads", "placements": ["facebook", "instagram"],
+                 "advantage_placements": True, "audience_mode": "advantage",
+                 "creative": {"format": "feed", "media_type": "image"}},
+        "audience_reach": 84000, "price_per_message": 0.0, "estimated_cost": 60000,
+        "cpm": 300, "estimated_impressions": 200000,
+        "cost": {"budget": 60000}, "status": "submitted", "step": "ready",
+    },
+    {
+        "name": "Кофейня «Бариста» — акция на завтраки",
+        "goal": "продвинуть акцию на завтраки", "product": "кофейня", "company": "Бариста",
+        "offer": "второй кофе в подарок",
+        "channel": "whatsapp",
+        "segments": {"geography": ["Москва"], "demographics": "all", "interests": ["food"],
+                     "audience_confirmed": True},
+        "whatsapp": {"format": "carousel", "template_category": "marketing", "sender_mode": "shared",
+                     "cards": [{"media_type": "image", "body": "Второй кофе в подарок к завтраку!",
+                                "buttons": [{"type": "quick_reply", "label": "Подробнее"}]}],
+                     "template_status": "approved"},
+        "audience_reach": 38000, "price_per_message": 9.0, "estimated_cost": 45000,
+        "cost": {"budget": 45000, "messages_count": 5000}, "status": "submitted", "step": "ready",
+    },
+)
+
+
 class ChatStore:
     """Single repository for the unified chat widget."""
 
@@ -376,6 +412,27 @@ class ChatStore:
             if c is None:
                 return None
             return {**self._campaign_dict(c), "draft": c.draft_json or {}}
+
+    async def delete_campaign(self, campaign_id: int) -> bool:
+        async with session_scope() as db:
+            c = await db.get(CampaignModel, campaign_id)
+            if c is None:
+                return False
+            await db.delete(c)
+            return True
+
+    async def count_campaigns(self) -> int:
+        async with session_scope() as db:
+            rows = await db.scalars(select(CampaignModel))
+            return len(list(rows))
+
+    async def seed_demo_campaigns(self) -> int:
+        """Seed demo campaigns once, only when the table is empty (fresh install)."""
+        if await self.count_campaigns() > 0:
+            return 0
+        for draft in _DEMO_CAMPAIGNS:
+            await self.save_campaign(session_id=None, draft=dict(draft), status="active")
+        return len(_DEMO_CAMPAIGNS)
 
     # ── Business profile (single row) ─────────────────────────────────────────
 

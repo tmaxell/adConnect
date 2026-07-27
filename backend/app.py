@@ -52,6 +52,7 @@ store = ChatStore()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    await store.seed_demo_campaigns()
     yield
 
 
@@ -129,6 +130,14 @@ async def list_session_messages(session_id: str):
 async def list_campaigns():
     """Campaigns assembled by the agent — backs the Ad Campaigns list."""
     return await store.list_campaigns()
+
+
+@app.delete("/api/campaigns/{campaign_id}")
+async def delete_campaign(campaign_id: int):
+    """Remove a campaign from the list."""
+    if not await store.delete_campaign(campaign_id):
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    return {"ok": True}
 
 
 # ── Business profile ──────────────────────────────────────────────────────────

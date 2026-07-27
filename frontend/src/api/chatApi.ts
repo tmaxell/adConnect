@@ -377,6 +377,10 @@ export async function listCampaigns(): Promise<CampaignSummary[]> {
   return list.map(normalizeCampaign);
 }
 
+export async function deleteCampaign(id: number): Promise<void> {
+  await http<unknown>(`/api/campaigns/${id}`, { method: "DELETE" });
+}
+
 // ── Analytics ─────────────────────────────────────────────────────────────────
 
 export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
