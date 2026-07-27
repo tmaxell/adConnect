@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { deleteAudience, getAudiences, type AudienceItem, type AudienceLibrary } from "../api/chatApi";
+import { t as tr, useLang } from "../i18n";
 
 function fmt(n: number): string {
   return (n || 0).toLocaleString("ru-RU").replace(/,/g, " ");
@@ -23,16 +24,17 @@ function specSummary(spec: Record<string, unknown>): string {
   if (Array.isArray(age) && age.length) parts.push(age.join(", "));
   const interests = spec.interests;
   if (Array.isArray(interests) && interests.length) parts.push(interests.join(", "));
-  return parts.join(" · ") || "Вся база";
+  return parts.join(" · ") || tr("Вся база", "Entire base");
 }
 
 export function AudiencesPage() {
+  const { t } = useLang();
   const [lib, setLib] = useState<AudienceLibrary | null>(null);
   const reload = () => getAudiences().then(setLib).catch(() => {});
   useEffect(() => { reload(); }, []);
 
   const remove = async (id: number | string) => {
-    if (!window.confirm("Удалить аудиторию из реестра?")) return;
+    if (!window.confirm(t("Удалить аудиторию из реестра?", "Remove this audience from the registry?"))) return;
     await deleteAudience(id);
     await reload();
   };
@@ -48,9 +50,9 @@ export function AudiencesPage() {
       </div>
       <span className="aud-row-reach">{fmt(a.reach)}</span>
       {deletable ? (
-        <button type="button" className="aud-row-del" title="Удалить" onClick={() => remove(a.id)}>✕</button>
+        <button type="button" className="aud-row-del" title={t("Удалить", "Delete")} onClick={() => remove(a.id)}>✕</button>
       ) : (
-        <span className="aud-row-tag">сегмент оператора</span>
+        <span className="aud-row-tag">{t("сегмент оператора", "operator segment")}</span>
       )}
     </div>
   );
@@ -58,19 +60,19 @@ export function AudiencesPage() {
   return (
     <div className="ana">
       <div className="ana-header">
-        <h1 className="ana-h1">Реестр аудиторий</h1>
-        <p className="ana-h1-sub">Единый список аудиторий: ваши сохранённые и готовые сегменты оператора. Сохраняйте аудитории на шаге «Аудитория» в мастере кампании и выбирайте их оттуда же.</p>
+        <h1 className="ana-h1">{t("Реестр аудиторий", "Audience registry")}</h1>
+        <p className="ana-h1-sub">{t("Единый список аудиторий: ваши сохранённые и готовые сегменты оператора. Сохраняйте аудитории на шаге «Аудитория» в мастере кампании и выбирайте их оттуда же.", "One shared list of audiences: your saved ones and the operator's ready-made segments. Save audiences on the “Audience” step of the campaign wizard and pick them back from the same place.")}</p>
       </div>
 
       <div className="ana-card-box">
-        <div className="aud-section-title">Мои сохранённые</div>
+        <div className="aud-section-title">{t("Мои сохранённые", "My saved")}</div>
         {saved.length > 0
           ? <div className="aud-list">{saved.map((a) => row(a, true))}</div>
-          : <div className="aud-empty">Пока нет сохранённых аудиторий. Соберите аудиторию в мастере кампании и нажмите «Сохранить аудиторию в реестр».</div>}
+          : <div className="aud-empty">{t("Пока нет сохранённых аудиторий. Соберите аудиторию в мастере кампании и нажмите «Сохранить аудиторию в реестр».", "No saved audiences yet. Build an audience in the campaign wizard and click “Save audience to registry”.")}</div>}
       </div>
 
       <div className="ana-card-box">
-        <div className="aud-section-title">Готовые сегменты оператора</div>
+        <div className="aud-section-title">{t("Готовые сегменты оператора", "Operator's ready-made segments")}</div>
         <div className="aud-list">{presets.map((a) => row(a, false))}</div>
       </div>
     </div>

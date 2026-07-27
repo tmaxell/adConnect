@@ -28,31 +28,39 @@ import {
   type WhatsAppFormat,
   type WizardStep,
 } from "../types/campaign";
-import { NETWORK_CHANNELS, OPERATOR_CHANNELS, type ChannelCard } from "./channels";
+import { getNetworkChannels, getOperatorChannels, type ChannelCard } from "./channels";
 import { useChatWorkspaceStore } from "../chat-workspace/store/chatWorkspaceStore";
 import { getAudiences, getProfile, saveAudience, type AudienceItem, type AudienceLibrary } from "../api/chatApi";
 import type { BusinessProfile } from "../types/campaign";
+import { t } from "../i18n";
 
 const CHANNEL_LABEL: Record<string, string> = { sms: "SMS", email: "Email", meta: "Meta", whatsapp: "WhatsApp" };
 function channelLabel(c: string | null): string {
   return c ? CHANNEL_LABEL[c] ?? c.toUpperCase() : "—";
 }
 
-const OBJECTIVE_LABEL: Record<string, string> = {
-  awareness: "Узнаваемость", traffic: "Трафик", engagement: "Вовлечённость",
-  leads: "Лиды", sales: "Продажи",
-};
+const ALL_OBJECTIVES = ["awareness", "traffic", "engagement", "leads", "sales"] as const;
+function objectiveLabel(o: string): string {
+  switch (o) {
+    case "awareness": return t("Узнаваемость", "Awareness");
+    case "traffic": return t("Трафик", "Traffic");
+    case "engagement": return t("Вовлечённость", "Engagement");
+    case "leads": return t("Лиды", "Leads");
+    case "sales": return t("Продажи", "Sales");
+    default: return o;
+  }
+}
 // Short descriptions mirror Meta's ODAX objective definitions.
-const OBJECTIVE_DESC: Record<string, string> = {
-  awareness: "Максимум охвата и запоминаемости бренда",
-  traffic: "Переходы на сайт, в приложение или чат",
-  engagement: "Сообщения, реакции, просмотры, отклики",
-  leads: "Заявки и контакты: форма, чат, WhatsApp",
-  sales: "Покупки и конверсии",
-};
-const ALL_OBJECTIVES: Array<keyof typeof OBJECTIVE_LABEL> = [
-  "awareness", "traffic", "engagement", "leads", "sales",
-];
+function objectiveDesc(o: string): string {
+  switch (o) {
+    case "awareness": return t("Максимум охвата и запоминаемости бренда", "Maximum reach and brand recall");
+    case "traffic": return t("Переходы на сайт, в приложение или чат", "Visits to a site, app or chat");
+    case "engagement": return t("Сообщения, реакции, просмотры, отклики", "Messages, reactions, views, responses");
+    case "leads": return t("Заявки и контакты: форма, чат, WhatsApp", "Leads and contacts: form, chat, WhatsApp");
+    case "sales": return t("Покупки и конверсии", "Purchases and conversions");
+    default: return "";
+  }
+}
 
 /** Minimal line icon per ODAX objective. */
 function ObjectiveIcon({ objective }: { objective: string }) {
@@ -70,34 +78,53 @@ const PLACEMENT_LABEL: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram", messenger: "Messenger",
   whatsapp: "WhatsApp", audience_network: "Audience Network",
 };
-const DEMOGRAPHICS_LABEL: Record<string, string> = { all: "Все", men: "Мужчины", women: "Женщины" };
-const INTEREST_LABEL: Record<string, string> = {
-  sport: "Спорт", travel: "Путешествия", tourism: "Туризм", movies: "Кино", walking: "Прогулки",
-  finance: "Финансы", technology: "Технологии", education: "Образование", food: "Еда",
-  fashion: "Мода", gaming: "Игры", business: "Бизнес", premium: "Премиум",
-  family: "Семья", kids: "Дети", entertainment: "Развлечения",
+function demographicsLabel(d: string): string {
+  switch (d) {
+    case "all": return t("Все", "All");
+    case "men": return t("Мужчины", "Men");
+    case "women": return t("Женщины", "Women");
+    default: return d;
+  }
+}
+// Interest keys are stored/sent as-is; only their display label is localized.
+function interestLabelMap(): Record<string, string> {
+  return {
+    sport: t("Спорт", "Sport"), travel: t("Путешествия", "Travel"), tourism: t("Туризм", "Tourism"),
+    movies: t("Кино", "Movies"), walking: t("Прогулки", "Walking"), finance: t("Финансы", "Finance"),
+    technology: t("Технологии", "Technology"), education: t("Образование", "Education"), food: t("Еда", "Food"),
+    fashion: t("Мода", "Fashion"), gaming: t("Игры", "Gaming"), business: t("Бизнес", "Business"),
+    premium: t("Премиум", "Premium"), family: t("Семья", "Family"), kids: t("Дети", "Kids"),
+    entertainment: t("Развлечения", "Entertainment"),
+  };
+}
+const mapInterests = (items: string[]) => {
+  const map = interestLabelMap();
+  return items.map((it) => map[it] ?? it);
 };
-const mapInterests = (items: string[]) => items.map((t) => INTEREST_LABEL[t] ?? t);
 const ALL_PLACEMENTS = ["facebook", "instagram", "messenger", "whatsapp", "audience_network"];
 
 // Tone presets for ad-copy generation. "recommended" lets the Copilot pick the
-// most effective angle and is the default.
-const TONES: Array<{ id: string; label: string }> = [
-  { id: "recommended", label: "✦ Рекомендуемый Copilot" },
-  { id: "selling", label: "Продающий" },
-  { id: "friendly", label: "Дружелюбный" },
-  { id: "business", label: "Деловой" },
-  { id: "short", label: "Краткий" },
-];
+// most effective angle and is the default. `id` is stable; label is display-only.
+function tones(): Array<{ id: string; label: string }> {
+  return [
+    { id: "recommended", label: t("✦ Рекомендуемый Copilot", "✦ Recommended by Copilot") },
+    { id: "selling", label: t("Продающий", "Selling") },
+    { id: "friendly", label: t("Дружелюбный", "Friendly") },
+    { id: "business", label: t("Деловой", "Business") },
+    { id: "short", label: t("Краткий", "Short") },
+  ];
+}
 
 // Creative formats (placement positions / Click-to-WhatsApp destination).
 const FORMAT_ORDER: MetaFormat[] = ["feed", "stories", "reels", "whatsapp"];
-const FORMAT_META: Record<MetaFormat, { label: string; ratio: string; hint: string }> = {
-  feed:     { label: "Лента",    ratio: "1:1",  hint: "Пост в ленте Facebook / Instagram" },
-  stories:  { label: "Истории",  ratio: "9:16", hint: "Полноэкранные Stories" },
-  reels:    { label: "Reels",    ratio: "9:16", hint: "Вертикальное видео Reels" },
-  whatsapp: { label: "WhatsApp", ratio: "9:16", hint: "Статус в WhatsApp + переход в чат" },
-};
+function formatMeta(f: MetaFormat): { label: string; ratio: string; hint: string } {
+  switch (f) {
+    case "feed": return { label: t("Лента", "Feed"), ratio: "1:1", hint: t("Пост в ленте Facebook / Instagram", "Feed post on Facebook / Instagram") };
+    case "stories": return { label: t("Истории", "Stories"), ratio: "9:16", hint: t("Полноэкранные Stories", "Full-screen Stories") };
+    case "reels": return { label: "Reels", ratio: "9:16", hint: t("Вертикальное видео Reels", "Vertical Reels video") };
+    case "whatsapp": return { label: "WhatsApp", ratio: "9:16", hint: t("Статус в WhatsApp + переход в чат", "WhatsApp Status + jump into chat") };
+  }
+}
 
 /** Formats available for the currently selected placements (mirrors the backend). */
 function availableFormats(placements: string[]): MetaFormat[] {
@@ -119,13 +146,13 @@ function isVideoFile(url: string | null): boolean {
 }
 
 function ctaLabel(objective: string, format: MetaFormat): string {
-  if (format === "whatsapp") return "Написать в WhatsApp";
+  if (format === "whatsapp") return t("Написать в WhatsApp", "Message on WhatsApp");
   switch (objective) {
-    case "sales": return "В магазин";
-    case "leads": return "Оставить заявку";
-    case "engagement": return "Написать";
-    case "awareness": return "Узнать больше";
-    default: return "Подробнее";
+    case "sales": return t("В магазин", "Shop now");
+    case "leads": return t("Оставить заявку", "Sign up");
+    case "engagement": return t("Написать", "Send message");
+    case "awareness": return t("Узнать больше", "Learn more");
+    default: return t("Подробнее", "Learn more");
   }
 }
 
@@ -185,12 +212,12 @@ function stepLabel(step: Exclude<WizardStep, "ready">, channel: Channel | null):
   const network = isNetworkChannel(channel);
   const whatsapp = channel === "whatsapp";
   switch (step) {
-    case "brief": return "Бриф";
-    case "channel": return "Канал";
-    case "segments": return network || whatsapp ? "Аудитория" : "Сегменты";
-    case "message": return whatsapp || network ? "Креатив" : "Сообщение";
-    case "cost": return "Стоимость";
-    case "confirmation": return "Подтверждение";
+    case "brief": return t("Бриф", "Brief");
+    case "channel": return t("Канал", "Channel");
+    case "segments": return network || whatsapp ? t("Аудитория", "Audience") : t("Сегменты", "Segments");
+    case "message": return whatsapp || network ? t("Креатив", "Creative") : t("Сообщение", "Message");
+    case "cost": return t("Стоимость", "Cost");
+    case "confirmation": return t("Подтверждение", "Confirmation");
   }
 }
 
@@ -228,7 +255,7 @@ function GenderRadios({ value, onChange, disabled }: { value: string; onChange: 
       {(["all", "men", "women"] as const).map((d) => (
         <button key={d} type="button" className="acw-radio-row" onClick={() => onChange(d)} disabled={disabled}>
           <span className={`acw-radio${value === d ? " on" : ""}`} />
-          <span>{DEMOGRAPHICS_LABEL[d]}</span>
+          <span>{demographicsLabel(d)}</span>
         </button>
       ))}
     </div>
@@ -237,7 +264,7 @@ function GenderRadios({ value, onChange, disabled }: { value: string; onChange: 
 
 /** Editable chip list — Enter/blur adds, × removes. */
 function EditableChips({
-  items, empty, labelMap, onAdd, onRemove, disabled, placeholder = "+ добавить",
+  items, empty, labelMap, onAdd, onRemove, disabled, placeholder,
 }: {
   items: string[];
   empty: string;
@@ -259,13 +286,13 @@ function EditableChips({
       {items.map((it) => (
         <span key={it} className="acw-chip acw-chip-edit">
           {labelMap?.[it] ?? it}
-          <button type="button" className="acw-chip-x" onClick={() => onRemove(it)} disabled={disabled} aria-label="Удалить">×</button>
+          <button type="button" className="acw-chip-x" onClick={() => onRemove(it)} disabled={disabled} aria-label={t("Удалить", "Remove")}>×</button>
         </span>
       ))}
       <input
         className="acw-chip-input"
         value={val}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t("+ добавить", "+ add")}
         disabled={disabled}
         onChange={(e) => setVal(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commit(); } }}
@@ -382,15 +409,15 @@ function Segmented<T extends string>({ value, options, onChange, disabled }: {
 /** Audience-size gauge (Specific ↔ Broad) — like Meta's audience-definition needle. */
 function AudienceGauge({ reach }: { reach: number }) {
   const pos = Math.max(4, Math.min(96, Math.round((Math.log10(Math.max(reach, 1000)) - 3) / 4 * 100)));
-  const band = pos < 33 ? "Узкая" : pos < 67 ? "Сбалансированная" : "Широкая";
+  const band = pos < 33 ? t("Узкая", "Narrow") : pos < 67 ? t("Сбалансированная", "Balanced") : t("Широкая", "Broad");
   return (
     <div className="acw-gauge">
       <div className="acw-gauge-head">
-        <span>Размер аудитории</span>
+        <span>{t("Размер аудитории", "Audience size")}</span>
         <span className="acw-gauge-band">{band} · ≈ {fmt(reach)}</span>
       </div>
       <div className="acw-gauge-track"><span className="acw-gauge-needle" style={{ left: `${pos}%` }} /></div>
-      <div className="acw-gauge-ends"><span>Точная</span><span>Широкая</span></div>
+      <div className="acw-gauge-ends"><span>{t("Точная", "Specific")}</span><span>{t("Широкая", "Broad")}</span></div>
     </div>
   );
 }
@@ -408,7 +435,7 @@ function StepBar({ draft, current, onJump }: {
   const submitted = draft.status === "submitted";
   return (
     <div className="acw-typecard">
-      <div className="acw-typename">{draft.channel ? `Кампания ${channelLabel(draft.channel)}` : "Новая кампания"}</div>
+      <div className="acw-typename">{draft.channel ? `${t("Кампания", "Campaign")} ${channelLabel(draft.channel)}` : t("Новая кампания", "New campaign")}</div>
       <div className="acw-steps">
         {STEP_ORDER.map((step, i) => {
           const done = submitted || i < reachedIdx;
@@ -441,25 +468,25 @@ function ReachPanel({ draft }: { draft: CampaignDraft }) {
   return (
     <aside className="acw-reach">
       <div className="acw-reach-num">{fmt(draft.audience_reach || 0)}</div>
-      <div className="acw-reach-cap">{network ? "Custom Audience" : whatsapp ? "Достижимо в WhatsApp" : "Охват аудитории"}</div>
+      <div className="acw-reach-cap">{network ? "Custom Audience" : whatsapp ? t("Достижимо в WhatsApp", "Reachable on WhatsApp") : t("Охват аудитории", "Audience reach")}</div>
       {whatsapp ? (
         <>
           <div className="acw-price-num">{draft.price_per_message || 0} ₽ <span className="acw-info">ⓘ</span></div>
-          <div className="acw-reach-cap">Цена за диалог</div>
+          <div className="acw-reach-cap">{t("Цена за диалог", "Price per conversation")}</div>
           {draft.cost.messages_count ? (
             <>
               <div className="acw-price-num acw-reach-imp">{fmt(draft.cost.messages_count)}</div>
-              <div className="acw-reach-cap">Ожидаемые диалоги</div>
+              <div className="acw-reach-cap">{t("Ожидаемые диалоги", "Expected conversations")}</div>
             </>
           ) : null}
-          <div className="acw-hint">Переписка с ботом после открытия диалога — бесплатно.</div>
+          <div className="acw-hint">{t("Переписка с ботом после открытия диалога — бесплатно.", "Chatting with the bot after the conversation opens is free.")}</div>
         </>
       ) : network ? (
         <>
           <div className="acw-price-num">{draft.cpm || 0} ₽ <span className="acw-info">ⓘ</span></div>
-          <div className="acw-reach-cap">CPM (за 1000 показов)</div>
+          <div className="acw-reach-cap">{t("CPM (за 1000 показов)", "CPM (per 1000 impressions)")}</div>
           <div className="acw-price-num acw-reach-imp">{fmt(draft.estimated_impressions || 0)}</div>
-          <div className="acw-reach-cap">Ожидаемые показы</div>
+          <div className="acw-reach-cap">{t("Ожидаемые показы", "Expected impressions")}</div>
           {draft.platform_breakdown.length > 0 && (
             <div className="acw-platforms">
               {draft.platform_breakdown.map((p) => (
@@ -474,7 +501,7 @@ function ReachPanel({ draft }: { draft: CampaignDraft }) {
       ) : (
         <>
           <div className="acw-price-num">{draft.price_per_message || 0} ₽ <span className="acw-info">ⓘ</span></div>
-          <div className="acw-reach-cap">Цена за сообщение</div>
+          <div className="acw-reach-cap">{t("Цена за сообщение", "Price per message")}</div>
         </>
       )}
     </aside>
@@ -494,10 +521,10 @@ function ChannelCardButton({ card, selected, api }: { card: ChannelCard; selecte
     >
       <div className="acw-chan-top">
         <span className="acw-chan-label">{card.label}</span>
-        {planned ? <span className="acw-soon">Скоро</span> : <span className={`acw-radio${selected ? " on" : ""}`} />}
+        {planned ? <span className="acw-soon">{t("Скоро", "Soon")}</span> : <span className={`acw-radio${selected ? " on" : ""}`} />}
       </div>
       <div className="acw-chan-desc">{card.description}</div>
-      {card.audienceLanding && <div className="acw-chan-meta">Аудитория: {card.audienceLanding}</div>}
+      {card.audienceLanding && <div className="acw-chan-meta">{t("Аудитория", "Audience")}: {card.audienceLanding}</div>}
       {card.note && <div className="acw-chan-note">{card.note}</div>}
     </button>
   );
@@ -512,8 +539,8 @@ function ObjectiveCards({ value, onPick, disabled }: { value: string; onPick: (o
         <button key={o} type="button" className={`acw-obj${value === o ? " on" : ""}`} disabled={disabled} onClick={() => onPick(o)}>
           <ObjectiveIcon objective={o} />
           <span className="acw-obj-text">
-            <span className="acw-obj-label">{OBJECTIVE_LABEL[o]}</span>
-            <span className="acw-obj-desc">{OBJECTIVE_DESC[o]}</span>
+            <span className="acw-obj-label">{objectiveLabel(o)}</span>
+            <span className="acw-obj-desc">{objectiveDesc(o)}</span>
           </span>
         </button>
       ))}
@@ -521,12 +548,14 @@ function ObjectiveCards({ value, onPick, disabled }: { value: string; onPick: (o
   );
 }
 
-const CTA_OPTIONS: Array<{ id: CtaType; label: string }> = [
-  { id: "site", label: "Сайт" },
-  { id: "whatsapp", label: "WhatsApp" },
-  { id: "lead", label: "Заявка" },
-  { id: "call", label: "Звонок" },
-];
+function ctaOptions(): Array<{ id: CtaType; label: string }> {
+  return [
+    { id: "site", label: t("Сайт", "Website") },
+    { id: "whatsapp", label: "WhatsApp" },
+    { id: "lead", label: t("Заявка", "Lead") },
+    { id: "call", label: t("Звонок", "Call") },
+  ];
+}
 
 function CtaPicker({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   const cta = draft.cta_type;
@@ -535,7 +564,7 @@ function CtaPicker({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   return (
     <>
       <div className="acw-chips">
-        {CTA_OPTIONS.map((o) => (
+        {ctaOptions().map((o) => (
           <button key={o.id} type="button"
             className={`acw-chip acw-chip-btn${cta === o.id ? " acw-chip-accent" : " acw-chip-off"}`}
             disabled={api.busy} onClick={() => api.update({ cta_type: cta === o.id ? null : o.id })}>
@@ -546,7 +575,7 @@ function CtaPicker({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
       {(showLink || showPhone) && (
         <div className="acw-sub-field">
           <EditableText value={draft.destination_url}
-            placeholder={showPhone ? "Телефон — например, +7 900 000-00-00" : "Ссылка — https://…"}
+            placeholder={showPhone ? t("Телефон — например, +7 900 000-00-00", "Phone — e.g. +7 900 000-00-00") : t("Ссылка — https://…", "Link — https://…")}
             onCommit={(v) => api.update({ destination_url: v })} disabled={api.busy} />
         </div>
       )}
@@ -565,32 +594,35 @@ function BriefStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   return (
     <>
       <div className="acw-brief-intro">
-        Опишите, что продвигаем и зачем — AdConnect Copilot использует это для подбора аудитории и генерации офферов и креативов.
+        {t(
+          "Опишите, что продвигаем и зачем — AdConnect Copilot использует это для подбора аудитории и генерации офферов и креативов.",
+          "Describe what you're promoting and why — AdConnect Copilot uses this to pick the audience and generate offers and creatives.",
+        )}
       </div>
-      <Field label="Что рекламируем" hint="Продукт или услуга — например: «фитнес-клуб», «доставка готовой еды».">
-        <EditableText value={draft.product} placeholder={profile?.default_product || "Продукт или услуга"}
+      <Field label={t("Что рекламируем", "What we're advertising")} hint={t("Продукт или услуга — например: «фитнес-клуб», «доставка готовой еды».", "Product or service — e.g. “fitness club”, “ready-meal delivery”.")}>
+        <EditableText value={draft.product} placeholder={profile?.default_product || t("Продукт или услуга", "Product or service")}
           onCommit={(v) => api.update({ product: v })} disabled={api.busy} />
       </Field>
-      <Field label="Компания / бренд">
-        <EditableText value={draft.company} placeholder={profile?.company_name || "Название компании"}
+      <Field label={t("Компания / бренд", "Company / brand")}>
+        <EditableText value={draft.company} placeholder={profile?.company_name || t("Название компании", "Company name")}
           onCommit={(v) => api.update({ company: v })} disabled={api.busy} />
       </Field>
-      <Field label="Оффер (необязательно)" hint="Спецпредложение этой кампании — например: «первый месяц бесплатно», «скидка 20%».">
-        <EditableText value={draft.offer} placeholder="Скидка, бонус, акция…"
+      <Field label={t("Оффер (необязательно)", "Offer (optional)")} hint={t("Спецпредложение этой кампании — например: «первый месяц бесплатно», «скидка 20%».", "A special offer for this campaign — e.g. “first month free”, “20% off”.")}>
+        <EditableText value={draft.offer} placeholder={t("Скидка, бонус, акция…", "Discount, bonus, promo…")}
           onCommit={(v) => api.update({ offer: v })} disabled={api.busy} />
       </Field>
-      <Field label="Ключевое преимущество (необязательно)" hint="Одна главная мысль креатива — чем вы лучше: например, «современное оборудование и тренеры-чемпионы».">
-        <EditableText value={draft.key_message} placeholder="Что выделяет вас среди конкурентов…"
+      <Field label={t("Ключевое преимущество (необязательно)", "Key benefit (optional)")} hint={t("Одна главная мысль креатива — чем вы лучше: например, «современное оборудование и тренеры-чемпионы».", "The one main idea of the creative — why you're better: e.g. “modern equipment and champion trainers”.")}>
+        <EditableText value={draft.key_message} placeholder={t("Что выделяет вас среди конкурентов…", "What sets you apart from competitors…")}
           onCommit={(v) => api.update({ key_message: v })} disabled={api.busy} />
       </Field>
-      <Field label="Целевое действие" hint="Куда ведём клиента — определяет призыв и кнопки в креативе.">
+      <Field label={t("Целевое действие", "Target action")} hint={t("Куда ведём клиента — определяет призыв и кнопки в креативе.", "Where you send the customer — defines the call to action and buttons in the creative.")}>
         <CtaPicker draft={draft} api={api} />
       </Field>
-      <Field label="Цель кампании" hint="Определяет, под что Copilot оптимизирует подбор и креативы.">
+      <Field label={t("Цель кампании", "Campaign objective")} hint={t("Определяет, под что Copilot оптимизирует подбор и креативы.", "Determines what the Copilot optimizes targeting and creatives for.")}>
         <ObjectiveCards value={draft.meta.objective} onPick={(o) => api.update({ objective: o })} disabled={api.busy} />
       </Field>
       {!profile?.company_name && (
-        <div className="acw-hint">Заполните «Профиль компании», чтобы не вводить компанию и тон каждый раз.</div>
+        <div className="acw-hint">{t("Заполните «Профиль компании», чтобы не вводить компанию и тон каждый раз.", "Fill in “Company profile” so you don't re-enter the company and tone every time.")}</div>
       )}
     </>
   );
@@ -599,15 +631,15 @@ function BriefStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
 function ChannelStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   return (
     <>
-      <div className="acw-section-title">Канал отправки оператора</div>
+      <div className="acw-section-title">{t("Канал отправки оператора", "Operator sending channel")}</div>
       <div className="acw-chan-list">
-        {OPERATOR_CHANNELS.map((c) => (
+        {getOperatorChannels().map((c) => (
           <ChannelCardButton key={c.id} card={c} selected={draft.channel === c.id} api={api} />
         ))}
       </div>
-      <div className="acw-section-title">Внешние рекламные сети</div>
+      <div className="acw-section-title">{t("Внешние рекламные сети", "External ad networks")}</div>
       <div className="acw-chan-list">
-        {NETWORK_CHANNELS.map((c) => (
+        {getNetworkChannels().map((c) => (
           <ChannelCardButton key={c.id} card={c} selected={draft.channel === c.id} api={api} />
         ))}
       </div>
@@ -650,21 +682,21 @@ function AudienceRegistryModal({ draft, api, onClose }: { draft: CampaignDraft; 
     <div className="acw-modal-backdrop" onClick={onClose}>
       <div className="acw-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
         <div className="acw-modal-head">
-          <span className="acw-modal-title">Реестр аудиторий</span>
-          <button type="button" className="acw-modal-close" onClick={onClose} aria-label="Закрыть">×</button>
+          <span className="acw-modal-title">{t("Реестр аудиторий", "Audience registry")}</span>
+          <button type="button" className="acw-modal-close" onClick={onClose} aria-label={t("Закрыть", "Close")}>×</button>
         </div>
-        <input className="acw-modal-search" value={q} placeholder="Поиск по названию…"
+        <input className="acw-modal-search" value={q} placeholder={t("Поиск по названию…", "Search by name…")}
           onChange={(e) => setQ(e.target.value)} />
         <div className="acw-modal-body">
           {saved.length > 0 && (
             <>
-              <div className="acw-aud-group">Мои сохранённые</div>
+              <div className="acw-aud-group">{t("Мои сохранённые", "My saved")}</div>
               <div className="acw-modal-list">{saved.map((a) => row(a, false))}</div>
             </>
           )}
-          <div className="acw-aud-group">Готовые сегменты оператора</div>
+          <div className="acw-aud-group">{t("Готовые сегменты оператора", "Operator's ready-made segments")}</div>
           <div className="acw-modal-list">{presets.map((a) => row(a, true))}</div>
-          {saved.length === 0 && presets.length === 0 && <div className="acw-hint">Ничего не найдено.</div>}
+          {saved.length === 0 && presets.length === 0 && <div className="acw-hint">{t("Ничего не найдено.", "Nothing found.")}</div>}
         </div>
       </div>
     </div>
@@ -676,16 +708,16 @@ function AudiencePicker({ draft, api }: { draft: CampaignDraft; api: WizardApi }
   const [open, setOpen] = useState(false);
   const active = draft.segments.matched_segment_name;
   return (
-    <Field label="Готовая аудитория из реестра (необязательно)" hint="Необязательный шаг: подставит параметры готового сегмента или сохранённой аудитории — их можно отредактировать ниже. Либо соберите аудиторию вручную в полях ниже.">
+    <Field label={t("Готовая аудитория из реестра (необязательно)", "Ready-made audience from the registry (optional)")} hint={t("Необязательный шаг: подставит параметры готового сегмента или сохранённой аудитории — их можно отредактировать ниже. Либо соберите аудиторию вручную в полях ниже.", "Optional step: fills in the parameters of a ready-made segment or saved audience — you can edit them below. Or build the audience manually in the fields below.")}>
       <div className="acw-aud-pick">
         {active && <span className="acw-chip acw-chip-accent">{active}</span>}
         <button type="button" className="acw-btn acw-btn-ghost" disabled={api.busy} onClick={() => setOpen(true)}>
-          {active ? "Сменить аудиторию" : "Выбрать из реестра"}
+          {active ? t("Сменить аудиторию", "Change audience") : t("Выбрать из реестра", "Pick from registry")}
         </button>
         {active && (
           <button type="button" className="acw-btn acw-btn-ghost" disabled={api.busy}
             onClick={() => api.update({ matched_segment_id: "", matched_segment_name: "" })}>
-            Очистить
+            {t("Очистить", "Clear")}
           </button>
         )}
       </div>
@@ -698,7 +730,10 @@ function AudiencePicker({ draft, api }: { draft: CampaignDraft; api: WizardApi }
 function SaveAudienceButton({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   const [saving, setSaving] = useState(false);
   const save = async () => {
-    const name = window.prompt("Название аудитории:", draft.product ? `Аудитория «${draft.product}»` : "Моя аудитория");
+    const name = window.prompt(
+      t("Название аудитории:", "Audience name:"),
+      draft.product ? t(`Аудитория «${draft.product}»`, `Audience “${draft.product}”`) : t("Моя аудитория", "My audience"),
+    );
     if (!name) return;
     setSaving(true);
     try {
@@ -710,7 +745,7 @@ function SaveAudienceButton({ draft, api }: { draft: CampaignDraft; api: WizardA
   };
   return (
     <button type="button" className="acw-btn acw-btn-ghost acw-aud-save" disabled={api.busy || saving} onClick={save}>
-      {saving ? <Spinner /> : <IconSave />}{saving ? "Сохраняю…" : "Сохранить аудиторию в реестр"}
+      {saving ? <Spinner /> : <IconSave />}{saving ? t("Сохраняю…", "Saving…") : t("Сохранить аудиторию в реестр", "Save audience to registry")}
     </button>
   );
 }
@@ -719,16 +754,20 @@ function SaveAudienceButton({ draft, api }: { draft: CampaignDraft; api: WizardA
 
 type SegKey = "tariff_type" | "arpu" | "device" | "data_usage" | "tenure"
   | "marital_status" | "occupation" | "education";
-const OP_FILTERS: Array<{ key: SegKey; label: string; options: string[] }> = [
-  { key: "tariff_type", label: "Тип тарифа", options: ["Предоплата", "Постоплата", "Корпоративный"] },
-  { key: "arpu", label: "Средний чек (ARPU)", options: ["до 300 ₽", "300–700 ₽", "700–1500 ₽", "1500+ ₽"] },
-  { key: "device", label: "Устройство", options: ["iOS", "Android", "Премиум", "Бюджетные"] },
-  { key: "data_usage", label: "Потребление трафика", options: ["Низкое", "Среднее", "Высокое"] },
-  { key: "tenure", label: "Стаж с оператором", options: ["до 1 года", "1–3 года", "3+ года"] },
-  { key: "marital_status", label: "Семейное положение", options: ["Холост/не замужем", "В браке"] },
-  { key: "occupation", label: "Занятость", options: ["Наёмный", "Свой бизнес", "Студент", "Пенсионер"] },
-  { key: "education", label: "Образование", options: ["Среднее", "Высшее"] },
-];
+// Only the field `label` is localized; `options` double as the values stored on
+// the draft / sent to the backend, so they stay language-stable.
+function opFilters(): Array<{ key: SegKey; label: string; options: string[] }> {
+  return [
+    { key: "tariff_type", label: t("Тип тарифа", "Tariff type"), options: ["Предоплата", "Постоплата", "Корпоративный"] },
+    { key: "arpu", label: t("Средний чек (ARPU)", "Average bill (ARPU)"), options: ["до 300 ₽", "300–700 ₽", "700–1500 ₽", "1500+ ₽"] },
+    { key: "device", label: t("Устройство", "Device"), options: ["iOS", "Android", "Премиум", "Бюджетные"] },
+    { key: "data_usage", label: t("Потребление трафика", "Data usage"), options: ["Низкое", "Среднее", "Высокое"] },
+    { key: "tenure", label: t("Стаж с оператором", "Tenure with operator"), options: ["до 1 года", "1–3 года", "3+ года"] },
+    { key: "marital_status", label: t("Семейное положение", "Marital status"), options: ["Холост/не замужем", "В браке"] },
+    { key: "occupation", label: t("Занятость", "Occupation"), options: ["Наёмный", "Свой бизнес", "Студент", "Пенсионер"] },
+    { key: "education", label: t("Образование", "Education"), options: ["Среднее", "Высшее"] },
+  ];
+}
 const TRIGGER_OPTIONS = ["Недавнее пополнение", "Окончание договора", "Смена устройства", "Всплеск трат", "Роуминг"];
 
 function SelectChips({ value, options, onPick, disabled }: {
@@ -746,40 +785,82 @@ function SelectChips({ value, options, onPick, disabled }: {
 
 function OperatorExtraFilters({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   const s = draft.segments;
+  const filters = opFilters();
   const activeCount =
-    OP_FILTERS.filter((f) => s[f.key]).length + (s.roaming ? 1 : 0) + (s.trigger_events.length ? 1 : 0);
+    filters.filter((f) => s[f.key]).length + (s.roaming ? 1 : 0) + (s.trigger_events.length ? 1 : 0);
   const [open, setOpen] = useState(activeCount > 0);
   return (
     <div className="acw-extra">
       <button type="button" className="acw-extra-head" onClick={() => setOpen((o) => !o)}>
-        <span>Доп. параметры аудитории{activeCount > 0 ? ` · ${activeCount}` : ""}</span>
+        <span>{t("Доп. параметры аудитории", "More audience parameters")}{activeCount > 0 ? ` · ${activeCount}` : ""}</span>
         <span className="acw-extra-caret">{open ? "▲" : "▼"}</span>
       </button>
       {open && (
         <div className="acw-extra-body">
-          {OP_FILTERS.map((f) => (
+          {filters.map((f) => (
             <Field key={f.key} label={f.label}>
               <SelectChips value={s[f.key]} options={f.options} disabled={api.busy}
                 onPick={(v) => api.update({ [f.key]: v })} />
             </Field>
           ))}
-          <Field label="Триггеры (события)">
+          <Field label={t("Триггеры (события)", "Triggers (events)")}>
             <div className="acw-chips">
-              {TRIGGER_OPTIONS.map((t) => {
-                const on = s.trigger_events.includes(t);
+              {TRIGGER_OPTIONS.map((trg) => {
+                const on = s.trigger_events.includes(trg);
                 return (
-                  <button key={t} type="button" className={`acw-chip acw-chip-btn${on ? " acw-chip-accent" : " acw-chip-off"}`}
-                    disabled={api.busy} onClick={() => api.update({ toggle_trigger: t })}>{t}</button>
+                  <button key={trg} type="button" className={`acw-chip acw-chip-btn${on ? " acw-chip-accent" : " acw-chip-off"}`}
+                    disabled={api.busy} onClick={() => api.update({ toggle_trigger: trg })}>{trg}</button>
                 );
               })}
             </div>
           </Field>
           <div className="acw-toggle-row">
-            <span>Были в роуминге / поездках</span>
+            <span>{t("Были в роуминге / поездках", "Have been in roaming / travelled")}</span>
             <Toggle on={s.roaming} onClick={() => api.update({ roaming: !s.roaming })} disabled={api.busy} />
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Copilot audience auto-pick ───────────────────────────────────────────────────
+// Reusable "let Copilot pick the audience" assist. Sits ABOVE the parameter
+// fields (which stay exactly as they were) — describe the customer in words,
+// press one button, and the Copilot fills the parameters below (still editable).
+// Routes through the existing chat agent (`sendMessage`) so no backend change is
+// needed; the request text is Russian because the agent runs server-side in RU.
+
+function CopilotAudienceAssist({ draft }: { draft: CampaignDraft }) {
+  const { sendMessage, sending } = useChatWorkspaceStore();
+  const [hint, setHint] = useState("");
+  const whatsapp = draft.channel === "whatsapp";
+  const run = () => {
+    const base = whatsapp
+      ? "Подбери аудиторию для этой WhatsApp-кампании на основе брифа и заполни параметры аудитории (сегмент абонентской базы, гео, демография, интересы)."
+      : "Подбери аудиторию для этой кампании на основе брифа и заполни параметры аудитории (гео, возраст, пол, интересы, источник).";
+    const text = hint.trim() ? `${base} Учти пожелание: ${hint.trim()}.` : base;
+    void sendMessage(text);
+  };
+  return (
+    <div className="acw-copilot-aud">
+      <div className="acw-copilot-tag">✦ {t("Подбор аудитории с Copilot", "Audience picking with Copilot")}</div>
+      <textarea
+        className="acw-textarea-edit acw-copilot-aud-input"
+        value={hint}
+        placeholder={t(
+          "Опишите идеального клиента (необязательно) — например: женщины 25–40, интересуются фитнесом, недавно пополняли счёт…",
+          "Describe your ideal customer (optional) — e.g. women 25–40, into fitness, recently topped up…",
+        )}
+        disabled={sending}
+        onChange={(e) => setHint(e.target.value)}
+      />
+      <div className="acw-copilot-aud-foot">
+        <button type="button" className="acw-btn acw-btn-primary acw-gen-btn" disabled={sending} onClick={run}>
+          {sending ? <Spinner /> : "✦"} {t("Подобрать аудиторию", "Pick audience")}
+        </button>
+        <span className="acw-hint">{t("Copilot заполнит параметры ниже — их можно поправить вручную.", "Copilot fills the parameters below — you can adjust them manually.")}</span>
+      </div>
     </div>
   );
 }
@@ -791,52 +872,54 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
   const m = draft.meta;
   const reach = fmt(draft.audience_reach || 0);
   const advantage = m.audience_mode === "advantage";
-  const suggestHint = advantage ? "Подсказка для AdConnect Copilot" : undefined;
+  const suggestHint = advantage ? t("Подсказка для AdConnect Copilot", "A hint for AdConnect Copilot") : undefined;
   return (
     <>
       <div className="acw-meta-account">
         <span className="acw-meta-account-dot" />
-        Рекламный аккаунт ведётся через кабинет оператора (Business Manager) — подключать свой не нужно.
+        {t("Рекламный аккаунт ведётся через кабинет оператора (Business Manager) — подключать свой не нужно.", "The ad account runs through the operator's cabinet (Business Manager) — you don't need to connect your own.")}
       </div>
 
       {/* Objective is set on the Brief step; show it here as read-only context. */}
       <div className="acw-objective-pill">
-        Цель: <b>{OBJECTIVE_LABEL[m.objective] ?? m.objective}</b>
+        {t("Цель", "Objective")}: <b>{objectiveLabel(m.objective)}</b>
       </div>
 
       <AudiencePicker draft={draft} api={api} />
 
       {/* Audience-building method — Advantage+ vs manual (Meta's two top modes). */}
-      <Field label="Метод подбора аудитории">
+      <Field label={t("Метод подбора аудитории", "Audience selection method")}>
         <Segmented
           value={m.audience_mode}
           onChange={(v) => api.update({ audience_mode: v })}
           disabled={api.busy}
           options={[
             { value: "advantage", label: "AdConnect Copilot" },
-            { value: "manual", label: "Ручная настройка" },
+            { value: "manual", label: t("Ручная настройка", "Manual setup") },
           ]}
         />
         <div className="acw-hint">
           {advantage
-            ? "AdConnect Copilot использует данные оператора (Custom Audience) и ваши подсказки (гео, возраст, интересы), чтобы найти больше похожих покупателей."
-            : "Вы полностью управляете таргетингом: источник, гео, возраст, интересы и плейсменты."}
+            ? t("AdConnect Copilot использует данные оператора (Custom Audience) и ваши подсказки (гео, возраст, интересы), чтобы найти больше похожих покупателей.", "AdConnect Copilot uses operator data (Custom Audience) and your hints (geo, age, interests) to find more similar customers.")
+            : t("Вы полностью управляете таргетингом: источник, гео, возраст, интересы и плейсменты.", "You fully control the targeting: source, geo, age, interests and placements.")}
         </div>
         <AudienceGauge reach={draft.audience_reach || 0} />
       </Field>
 
+      {advantage && <CopilotAudienceAssist draft={draft} />}
+
       {/* Audience source — operator Custom Audience seed + optional Lookalike. */}
-      <Field label="Источник аудитории">
+      <Field label={t("Источник аудитории", "Audience source")}>
         <div className="acw-source-card">
           <span className="acw-source-tag">Custom Audience</span>
-          <span>Данные оператора · совпадение ≈ 60% · ≈ {reach} профилей</span>
+          <span>{t("Данные оператора", "Operator data")} · {t("совпадение", "match")} ≈ 60% · ≈ {reach} {t("профилей", "profiles")}</span>
         </div>
         {advantage ? (
-          <div className="acw-hint">Lookalike-моделирование встроено в AdConnect Copilot — он сам расширит аудиторию.</div>
+          <div className="acw-hint">{t("Lookalike-моделирование встроено в AdConnect Copilot — он сам расширит аудиторию.", "Lookalike modeling is built into AdConnect Copilot — it expands the audience for you.")}</div>
         ) : (
           <>
             <div className="acw-toggle-row">
-              <span>Похожая аудитория (Lookalike)</span>
+              <span>{t("Похожая аудитория (Lookalike)", "Lookalike audience")}</span>
               <Toggle on={m.lookalike} onClick={() => api.update({ lookalike: !m.lookalike })} disabled={api.busy} />
             </div>
             {m.lookalike && (
@@ -847,9 +930,9 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
                   onChange={(e) => api.update({ lookalike_pct: Number(e.target.value) })}
                 />
                 <div className="acw-look-ends">
-                  <span>1% — ближе к источнику</span>
+                  <span>{t("1% — ближе к источнику", "1% — closer to the source")}</span>
                   <span className="acw-look-val">{m.lookalike_pct}%</span>
-                  <span>10% — шире охват</span>
+                  <span>{t("10% — шире охват", "10% — broader reach")}</span>
                 </div>
               </div>
             )}
@@ -859,57 +942,57 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
 
       {/* Locations — a *hard control* even under Advantage+; geo first for local SMB. */}
       <div className="acw-geo">
-        <Field label="Локации" badge="Жёсткое условие">
+        <Field label={t("Локации", "Locations")} badge={t("Жёсткое условие", "Hard condition")}>
           <EditableChips
             items={s.geography}
-            empty="Город или регион (можно радиус вокруг точки)"
+            empty={t("Город или регион (можно радиус вокруг точки)", "City or region (a radius around a point works too)")}
             onAdd={(v) => api.update({ geography_add: v })}
             onRemove={(v) => api.update({ geography_remove: v })}
             disabled={api.busy}
-            placeholder="+ город"
+            placeholder={t("+ город", "+ city")}
           />
-          <div className="acw-hint">Города и регионы — ключевой таргетинг для локального бизнеса.</div>
+          <div className="acw-hint">{t("Города и регионы — ключевой таргетинг для локального бизнеса.", "Cities and regions — the key targeting for local businesses.")}</div>
         </Field>
       </div>
 
-      <Field label="Возраст и пол" hint={suggestHint}>
+      <Field label={t("Возраст и пол", "Age and gender")} hint={suggestHint}>
         <GenderRadios value={s.demographics} onChange={(v) => api.update({ demographics: v })} disabled={api.busy} />
         <div className="acw-sub-field">
           <EditableChips
             items={s.age}
-            empty="Возраст (например, 18-30)"
+            empty={t("Возраст (например, 18-30)", "Age (e.g. 18-30)")}
             onAdd={(v) => api.update({ age: [...s.age, v] })}
             onRemove={(v) => api.update({ age: s.age.filter((x) => x !== v) })}
             disabled={api.busy}
-            placeholder="+ возраст"
+            placeholder={t("+ возраст", "+ age")}
           />
         </div>
       </Field>
 
-      <Field label="Детальный таргетинг" hint={suggestHint}>
+      <Field label={t("Детальный таргетинг", "Detailed targeting")} hint={suggestHint}>
         <EditableChips
           items={s.interests}
-          labelMap={INTEREST_LABEL}
-          empty="Интересы и поведение"
+          labelMap={interestLabelMap()}
+          empty={t("Интересы и поведение", "Interests and behavior")}
           onAdd={(v) => api.update({ interests: [...s.interests, v] })}
           onRemove={(v) => api.update({ interests: s.interests.filter((x) => x !== v) })}
           disabled={api.busy}
-          placeholder="+ интерес"
+          placeholder={t("+ интерес", "+ interest")}
         />
       </Field>
 
       <OperatorExtraFilters draft={draft} api={api} />
 
       {/* Placements — Advantage+ (auto) by default, switchable to manual. */}
-      <Field label="Плейсменты">
+      <Field label={t("Плейсменты", "Placements")}>
         <div className="acw-toggle-row">
-          <span>Автоматические плейсменты (AdConnect Copilot)</span>
+          <span>{t("Автоматические плейсменты (AdConnect Copilot)", "Automatic placements (AdConnect Copilot)")}</span>
           <Toggle on={m.advantage_placements} onClick={() => api.update({ advantage_placements: !m.advantage_placements })} disabled={api.busy} />
         </div>
         <div className="acw-hint">
           {m.advantage_placements
-            ? "AdConnect Copilot распределит показы по площадкам для лучшего результата (рекомендуется)."
-            : "Выберите площадки вручную — нажмите, чтобы включить или выключить."}
+            ? t("AdConnect Copilot распределит показы по площадкам для лучшего результата (рекомендуется).", "AdConnect Copilot will distribute impressions across placements for the best result (recommended).")
+            : t("Выберите площадки вручную — нажмите, чтобы включить или выключить.", "Choose placements manually — click to toggle on or off.")}
         </div>
         <div className="acw-chips">
           {ALL_PLACEMENTS.map((p) => {
@@ -941,45 +1024,45 @@ function OperatorSegmentsStep({ draft, api }: { draft: CampaignDraft; api: Wizar
     <>
       <AudiencePicker draft={draft} api={api} />
       {s.matched_segment_name && (
-        <Field label="Сегмент абонентской базы">
+        <Field label={t("Сегмент абонентской базы", "Subscriber-base segment")}>
           <div className="acw-chips"><span className="acw-chip acw-chip-accent">{s.matched_segment_name}</span></div>
         </Field>
       )}
-      <Field label="География">
+      <Field label={t("География", "Geography")}>
         <EditableChips
           items={s.geography}
-          empty="Регион или город"
+          empty={t("Регион или город", "Region or city")}
           onAdd={(v) => api.update({ geography_add: v })}
           onRemove={(v) => api.update({ geography_remove: v })}
           disabled={api.busy}
-          placeholder="+ город"
+          placeholder={t("+ город", "+ city")}
         />
       </Field>
-      <Field label="Демография">
+      <Field label={t("Демография", "Demographics")}>
         <GenderRadios value={s.demographics} onChange={(v) => api.update({ demographics: v })} disabled={api.busy} />
         <div className="acw-sub-field">
           <EditableChips
             items={s.age}
-            empty="Возраст"
+            empty={t("Возраст", "Age")}
             onAdd={(v) => api.update({ age: [...s.age, v] })}
             onRemove={(v) => api.update({ age: s.age.filter((x) => x !== v) })}
             disabled={api.busy}
-            placeholder="+ возраст"
+            placeholder={t("+ возраст", "+ age")}
           />
         </div>
       </Field>
-      <Field label="Доход и пополнения">
-        <Chips items={[s.monthly_income, s.deposits_per_month].filter(Boolean) as string[]} empty="Доход / пополнения в месяц" />
+      <Field label={t("Доход и пополнения", "Income and top-ups")}>
+        <Chips items={[s.monthly_income, s.deposits_per_month].filter(Boolean) as string[]} empty={t("Доход / пополнения в месяц", "Income / top-ups per month")} />
       </Field>
-      <Field label="Интересы и доп. признаки">
+      <Field label={t("Интересы и доп. признаки", "Interests and extra attributes")}>
         <EditableChips
           items={s.interests}
-          labelMap={INTEREST_LABEL}
-          empty="Интересы"
+          labelMap={interestLabelMap()}
+          empty={t("Интересы", "Interests")}
           onAdd={(v) => api.update({ interests: [...s.interests, v] })}
           onRemove={(v) => api.update({ interests: s.interests.filter((x) => x !== v) })}
           disabled={api.busy}
-          placeholder="+ интерес"
+          placeholder={t("+ интерес", "+ interest")}
         />
       </Field>
 
@@ -990,38 +1073,13 @@ function OperatorSegmentsStep({ draft, api }: { draft: CampaignDraft; api: Wizar
 
 // ── WhatsApp Business — account/sender setup (mirrors Meta's account badge) ───────
 
-function WhatsAppSetup({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
-  const wa = draft.whatsapp;
-  const dedicated = wa.sender_mode === "dedicated";
+function WhatsAppSetup({ draft: _draft, api: _api }: { draft: CampaignDraft; api: WizardApi }) {
   return (
     <>
       <div className="acw-meta-account">
         <span className="acw-meta-account-dot" />
-        Рассылка идёт под аккаунтом оператора — подключать свой аккаунт WhatsApp не нужно.
-        Шаблон проходит согласование в Meta.
+        {t("Рассылка идёт под аккаунтом оператора — подключать свой аккаунт WhatsApp не нужно. Шаблон проходит согласование в Meta.", "The broadcast runs under the operator's account — you don't need to connect your own WhatsApp account. The template is approved by Meta.")}
       </div>
-      <Field label="Отправитель" hint="Общий аккаунт оператора подходит большинству. Крупным рекламодателям оператор заводит выделенного отправителя со своим именем.">
-        <Segmented
-          value={wa.sender_mode}
-          onChange={(v) => api.update({ wa_sender_mode: v })}
-          disabled={api.busy}
-          options={[
-            { value: "shared", label: "AdConnect Promo (общий)" },
-            { value: "dedicated", label: "Выделенный отправитель" },
-          ]}
-        />
-        {dedicated && (
-          <div className="acw-sub-field">
-            <EditableText
-              value={wa.sender_name}
-              placeholder="Отображаемое имя отправителя (например, бренд)"
-              onCommit={(v) => api.update({ wa_sender_name: v })}
-              disabled={api.busy}
-            />
-            <div className="acw-hint">Выделенного отправителя и его верификацию готовит оператор.</div>
-          </div>
-        )}
-      </Field>
     </>
   );
 }
@@ -1032,8 +1090,9 @@ function WhatsAppAudienceStep({ draft, api }: { draft: CampaignDraft; api: Wizar
       <WhatsAppSetup draft={draft} api={api} />
       <div className="acw-source-card">
         <span className="acw-source-tag">opt-in</span>
-        <span>Сообщения уходят только подписчикам с WhatsApp, давшим согласие (покрытие ≈ 70% базы).</span>
+        <span>{t("Сообщения уходят только подписчикам с WhatsApp, давшим согласие (покрытие ≈ 70% базы).", "Messages go only to WhatsApp subscribers who opted in (coverage ≈ 70% of the base).")}</span>
       </div>
+      <CopilotAudienceAssist draft={draft} />
       <OperatorSegmentsStep draft={draft} api={api} />
     </>
   );
@@ -1048,8 +1107,10 @@ function SegmentsStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) 
   return (
     <>
       <div className="acw-brief-intro">
-        Соберите свою аудиторию вручную — задайте гео, демографию, интересы и доп. параметры в полях ниже.
-        Реестр готовых аудиторий — необязательный быстрый старт.
+        {t(
+          "Соберите свою аудиторию вручную — задайте гео, демографию, интересы и доп. параметры в полях ниже. Реестр готовых аудиторий — необязательный быстрый старт.",
+          "Build your audience manually — set geo, demographics, interests and extra parameters in the fields below. The registry of ready-made audiences is an optional quick start.",
+        )}
       </div>
       {content}
       <div className="acw-aud-savebar"><SaveAudienceButton draft={draft} api={api} /></div>
@@ -1071,7 +1132,7 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
   const places = draft.meta.advantage_placements ? ALL_PLACEMENTS : draft.meta.placements;
   const formats = availableFormats(places);
   const headline = draft.message.text || draft.meta.creative.headline || draft.goal;
-  const vertical = FORMAT_META[creative.format]?.ratio === "9:16";
+  const vertical = formatMeta(creative.format).ratio === "9:16";
 
   const gen = async (media_type: MediaType) => {
     setBusyKind(media_type === "video" ? "video" : "image");
@@ -1094,11 +1155,12 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
   const disabled = api.busy || busyKind !== null;
   return (
     <>
-      <Field label="Формат размещения">
-        <div className="acw-hint">Доступные форматы зависят от выбранных площадок.</div>
+      <Field label={t("Формат размещения", "Placement format")}>
+        <div className="acw-hint">{t("Доступные форматы зависят от выбранных площадок.", "Available formats depend on the selected placements.")}</div>
         <div className="acw-formats">
           {formats.map((f) => {
             const on = creative.format === f;
+            const meta = formatMeta(f);
             return (
               <button
                 key={f}
@@ -1107,32 +1169,32 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
                 disabled={disabled}
                 onClick={() => api.update({ format: f })}
               >
-                <span className="acw-format-label">{FORMAT_META[f].label}</span>
-                <span className="acw-format-ratio">{FORMAT_META[f].ratio}</span>
-                <span className="acw-format-hint">{FORMAT_META[f].hint}</span>
+                <span className="acw-format-label">{meta.label}</span>
+                <span className="acw-format-ratio">{meta.ratio}</span>
+                <span className="acw-format-hint">{meta.hint}</span>
               </button>
             );
           })}
         </div>
       </Field>
 
-      <Field label="Текст объявления" hint="Выберите тон и сгенерируйте варианты — затем выберите лучший и при необходимости отредактируйте.">
+      <Field label={t("Текст объявления", "Ad copy")} hint={t("Выберите тон и сгенерируйте варианты — затем выберите лучший и при необходимости отредактируйте.", "Pick a tone and generate variants — then choose the best one and edit if needed.")}>
         <div className="acw-gen-row">
           <div className="acw-tone">
-            {TONES.map((t) => (
+            {tones().map((tn) => (
               <button
-                key={t.id}
+                key={tn.id}
                 type="button"
-                className={`acw-tone-chip${tone === t.id ? " on" : ""}`}
+                className={`acw-tone-chip${tone === tn.id ? " on" : ""}`}
                 disabled={disabled}
-                onClick={() => setTone(t.id)}
+                onClick={() => setTone(tn.id)}
               >
-                {t.label}
+                {tn.label}
               </button>
             ))}
           </div>
           <button type="button" className="acw-btn acw-btn-primary acw-gen-btn" disabled={disabled} onClick={genCopy}>
-            {busyKind === "copy" ? <Spinner /> : "✦"} Сгенерировать варианты
+            {busyKind === "copy" ? <Spinner /> : "✦"} {t("Сгенерировать варианты", "Generate variants")}
           </button>
         </div>
 
@@ -1148,7 +1210,7 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
                   disabled={disabled}
                   onClick={() => api.update({ message_text: v, headline: v })}
                 >
-                  <span className="acw-copy-card-badge">{selected ? "✓ Выбран" : `Вариант ${i + 1}`}</span>
+                  <span className="acw-copy-card-badge">{selected ? t("✓ Выбран", "✓ Selected") : `${t("Вариант", "Variant")} ${i + 1}`}</span>
                   <span className="acw-copy-card-text">{v}</span>
                 </button>
               );
@@ -1159,7 +1221,7 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
         <div className="acw-sub-field">
           <EditableText
             value={draft.message.text}
-            placeholder="Текст объявления — выберите вариант выше или впишите свой…"
+            placeholder={t("Текст объявления — выберите вариант выше или впишите свой…", "Ad copy — pick a variant above or write your own…")}
             onCommit={(v) => api.update({ message_text: v, headline: v })}
             multiline
             disabled={disabled}
@@ -1167,39 +1229,39 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
         </div>
       </Field>
 
-      <Field label="Изображение / видео по промпту" hint="Опишите, что изобразить, либо оставьте пустым — ✦ AdConnect Copilot подберёт визуал сам.">
+      <Field label={t("Изображение / видео по промпту", "Image / video from a prompt")} hint={t("Опишите, что изобразить, либо оставьте пустым — ✦ AdConnect Copilot подберёт визуал сам.", "Describe what to depict, or leave it empty — ✦ AdConnect Copilot will pick the visual itself.")}>
         <textarea
           className="acw-textarea-edit"
           value={prompt}
-          placeholder="Например: интерьер фитнес-клуба, утренний свет, улыбающиеся люди на тренировке…"
+          placeholder={t("Например: интерьер фитнес-клуба, утренний свет, улыбающиеся люди на тренировке…", "e.g. a fitness-club interior, morning light, smiling people working out…")}
           disabled={disabled}
           onChange={(e) => setPrompt(e.target.value)}
         />
       </Field>
 
       <div className="acw-creative-grid">
-        <Field label="Медиа">
-          <div className="acw-copilot-tag">✦ Генерация на базе AdConnect Copilot</div>
+        <Field label={t("Медиа", "Media")}>
+          <div className="acw-copilot-tag">{t("✦ Генерация на базе AdConnect Copilot", "✦ Generated by AdConnect Copilot")}</div>
           <div className="acw-media-actions">
             <button type="button" className="acw-btn acw-btn-ghost acw-media-btn" disabled={disabled} onClick={() => gen("image")}>
-              {busyKind === "image" ? <Spinner /> : <IconPhoto />}Сгенерировать фото
+              {busyKind === "image" ? <Spinner /> : <IconPhoto />}{t("Сгенерировать фото", "Generate photo")}
             </button>
             <button type="button" className="acw-btn acw-btn-ghost acw-media-btn" disabled={disabled} onClick={() => gen("video")}>
-              {busyKind === "video" ? <Spinner /> : <IconVideo />}Сгенерировать видео
+              {busyKind === "video" ? <Spinner /> : <IconVideo />}{t("Сгенерировать видео", "Generate video")}
             </button>
             <button type="button" className="acw-btn acw-btn-ghost acw-media-btn" disabled={disabled} onClick={() => fileRef.current?.click()}>
-              {busyKind === "upload" ? <Spinner /> : <IconUpload />}Загрузить файл
+              {busyKind === "upload" ? <Spinner /> : <IconUpload />}{t("Загрузить файл", "Upload file")}
             </button>
             <input ref={fileRef} type="file" accept="image/*,video/*" hidden onChange={onFile} />
           </div>
           {creative.media_url ? (
             <div className="acw-media-meta">
-              {creative.media_type === "video" ? "Видео" : "Изображение"} ·{" "}
-              {creative.media_source === "generated" ? "сгенерировано" : "загружено"} ·{" "}
-              {FORMAT_META[creative.format].ratio}
+              {creative.media_type === "video" ? t("Видео", "Video") : t("Изображение", "Image")} ·{" "}
+              {creative.media_source === "generated" ? t("сгенерировано", "generated") : t("загружено", "uploaded")} ·{" "}
+              {formatMeta(creative.format).ratio}
             </div>
           ) : (
-            <div className="acw-hint">Сгенерируйте или загрузите изображение либо видео для объявления.</div>
+            <div className="acw-hint">{t("Сгенерируйте или загрузите изображение либо видео для объявления.", "Generate or upload an image or video for the ad.")}</div>
           )}
         </Field>
 
@@ -1207,8 +1269,8 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
         <div className={`acw-adpreview${vertical ? " vertical" : ""}`}>
           <div className="acw-adpreview-head">
             <span className="acw-adpreview-avatar" />
-            <span className="acw-adpreview-brand">{draft.product || "Ваш бренд"}</span>
-            <span className="acw-adpreview-sponsored">Реклама</span>
+            <span className="acw-adpreview-brand">{draft.product || t("Ваш бренд", "Your brand")}</span>
+            <span className="acw-adpreview-sponsored">{t("Реклама", "Sponsored")}</span>
           </div>
           <div className="acw-adpreview-media">
             {creative.media_url ? (
@@ -1218,7 +1280,7 @@ function MetaCreativeStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
                 <img src={creative.media_url} className="acw-adpreview-asset" alt="creative" />
               )
             ) : (
-              <div className="acw-adpreview-empty">{FORMAT_META[creative.format].label}</div>
+              <div className="acw-adpreview-empty">{formatMeta(creative.format).label}</div>
             )}
             {headline && <div className="acw-adpreview-overlay">{headline}</div>}
           </div>
@@ -1242,7 +1304,7 @@ function WhatsAppButtonsEditor({ card, index, api, disabled }: {
   const update = (i: number, patch: Partial<WhatsAppButton>) =>
     setButtons(card.buttons.map((b, j) => (j === i ? { ...b, ...patch } : b)));
   const remove = (i: number) => setButtons(card.buttons.filter((_, j) => j !== i));
-  const add = () => setButtons([...card.buttons, { type: "quick_reply", label: "Подробнее", value: null }]);
+  const add = () => setButtons([...card.buttons, { type: "quick_reply", label: t("Подробнее", "Learn more"), value: null }]);
   return (
     <div className="acw-wa-buttons">
       {card.buttons.map((b, i) => (
@@ -1251,32 +1313,34 @@ function WhatsAppButtonsEditor({ card, index, api, disabled }: {
             value={b.type}
             onChange={(v) => update(i, { type: v, value: v === "url" ? b.value : null })}
             disabled={disabled}
-            options={[{ value: "quick_reply", label: "Ответ" }, { value: "url", label: "Ссылка" }]}
+            options={[{ value: "quick_reply", label: t("Ответ", "Reply") }, { value: "url", label: t("Ссылка", "Link") }]}
           />
           <div className="acw-wa-btn-fields">
-            <EditableText value={b.label} placeholder="Текст кнопки" disabled={disabled}
+            <EditableText value={b.label} placeholder={t("Текст кнопки", "Button text")} disabled={disabled}
               onCommit={(v) => update(i, { label: v })} />
             {b.type === "url" && (
               <EditableText value={b.value} placeholder="https://" disabled={disabled}
                 onCommit={(v) => update(i, { value: v })} />
             )}
           </div>
-          <button type="button" className="acw-chip-x" disabled={disabled} onClick={() => remove(i)} aria-label="Удалить">×</button>
+          <button type="button" className="acw-chip-x" disabled={disabled} onClick={() => remove(i)} aria-label={t("Удалить", "Remove")}>×</button>
         </div>
       ))}
       {card.buttons.length < 2 && (
-        <button type="button" className="acw-btn acw-btn-ghost acw-wa-add-btn" disabled={disabled} onClick={add}>＋ Кнопка</button>
+        <button type="button" className="acw-btn acw-btn-ghost acw-wa-add-btn" disabled={disabled} onClick={add}>＋ {t("Кнопка", "Button")}</button>
       )}
     </div>
   );
 }
 
 const WA_FORMAT_ORDER: WhatsAppFormat[] = ["single", "carousel", "text"];
-const WA_FORMAT_META: Record<WhatsAppFormat, { label: string; hint: string }> = {
-  single:   { label: "Одно сообщение", hint: "Картинка/видео + текст + кнопки" },
-  carousel: { label: "Карусель",       hint: "До 10 карточек, листаются" },
-  text:     { label: "Текст + кнопки",  hint: "Сообщение без медиа" },
-};
+function waFormatMeta(f: WhatsAppFormat): { label: string; hint: string } {
+  switch (f) {
+    case "single": return { label: t("Одно сообщение", "Single message"), hint: t("Картинка/видео + текст + кнопки", "Image/video + text + buttons") };
+    case "carousel": return { label: t("Карусель", "Carousel"), hint: t("До 10 карточек, листаются", "Up to 10 swipeable cards") };
+    case "text": return { label: t("Текст + кнопки", "Text + buttons"), hint: t("Сообщение без медиа", "Message with no media") };
+  }
+}
 
 function WhatsAppCardEditor({ draft, api, index, disabled, onGen, hideMedia, numbered }: {
   draft: CampaignDraft; api: WizardApi; index: number; disabled?: boolean;
@@ -1287,9 +1351,9 @@ function WhatsAppCardEditor({ draft, api, index, disabled, onGen, hideMedia, num
   return (
     <div className="acw-wa-card">
       <div className="acw-wa-card-head">
-        <span className="acw-wa-card-num">{numbered ? `Карточка ${index + 1}` : "Сообщение"}</span>
+        <span className="acw-wa-card-num">{numbered ? `${t("Карточка", "Card")} ${index + 1}` : t("Сообщение", "Message")}</span>
         {numbered && (
-          <button type="button" className="acw-chip-x" disabled={disabled} onClick={() => api.update({ wa_remove_card: index })} aria-label="Удалить карточку">×</button>
+          <button type="button" className="acw-chip-x" disabled={disabled} onClick={() => api.update({ wa_remove_card: index })} aria-label={t("Удалить карточку", "Remove card")}>×</button>
         )}
       </div>
       {!hideMedia && (
@@ -1300,11 +1364,11 @@ function WhatsAppCardEditor({ draft, api, index, disabled, onGen, hideMedia, num
               : <div className="acw-adpreview-empty">1:1</div>}
           </div>
           <button type="button" className="acw-btn acw-btn-ghost acw-media-btn" disabled={disabled} onClick={() => onGen(index)}>
-            <IconPhoto />{card.media_url ? "Перегенерировать фото" : "Сгенерировать фото"}
+            <IconPhoto />{card.media_url ? t("Перегенерировать фото", "Regenerate photo") : t("Сгенерировать фото", "Generate photo")}
           </button>
         </>
       )}
-      <EditableText value={card.body} placeholder="Текст сообщения…" multiline disabled={disabled}
+      <EditableText value={card.body} placeholder={t("Текст сообщения…", "Message text…")} multiline disabled={disabled}
         onCommit={(v) => api.update({ wa_card_body: { index, body: v } })} />
       <WhatsAppButtonsEditor card={card} index={index} api={api} disabled={disabled} />
     </div>
@@ -1314,7 +1378,7 @@ function WhatsAppCardEditor({ draft, api, index, disabled, onGen, hideMedia, num
 function WhatsAppPreview({ draft }: { draft: CampaignDraft }) {
   const wa = draft.whatsapp;
   const format: WhatsAppFormat = wa.format ?? "carousel";
-  const sender = wa.sender_mode === "dedicated" ? (wa.sender_name || "Ваш бренд") : "AdConnect Promo";
+  const sender = wa.sender_mode === "dedicated" ? (wa.sender_name || t("Ваш бренд", "Your brand")) : "AdConnect Promo";
   const withMedia = format !== "text";
   const cards = format === "carousel" ? wa.cards : wa.cards.slice(0, 1);
   return (
@@ -1322,11 +1386,11 @@ function WhatsAppPreview({ draft }: { draft: CampaignDraft }) {
       <div className="acw-wa-preview-head">
         <span className="acw-wa-preview-avatar" />
         <span className="acw-wa-preview-name">{sender}</span>
-        <span className="acw-wa-preview-badge">бот</span>
+        <span className="acw-wa-preview-badge">{t("бот", "bot")}</span>
       </div>
       <div className="acw-wa-preview-body">
         {cards.length === 0 ? (
-          <div className="acw-hint">Соберите креатив, чтобы увидеть превью сообщения.</div>
+          <div className="acw-hint">{t("Соберите креатив, чтобы увидеть превью сообщения.", "Build the creative to see a message preview.")}</div>
         ) : (
           <div className={`acw-wa-preview-carousel${format !== "carousel" ? " single" : ""}`}>
             {cards.map((c, i) => (
@@ -1385,33 +1449,36 @@ function WhatsAppCreativeStep({ draft, api }: { draft: CampaignDraft; api: Wizar
     } finally { setBusy(false); }
   };
 
-  const genLabel = isCarousel ? "Собрать карусель" : isText ? "Сгенерировать текст" : "Сгенерировать сообщение";
+  const genLabel = isCarousel ? t("Собрать карусель", "Build carousel") : isText ? t("Сгенерировать текст", "Generate text") : t("Сгенерировать сообщение", "Generate message");
 
   return (
     <>
-      <Field label="Формат шаблона" hint="Маркетинговый шаблон проходит согласование в Meta. Выберите вид сообщения.">
+      <Field label={t("Формат шаблона", "Template format")} hint={t("Маркетинговый шаблон проходит согласование в Meta. Выберите вид сообщения.", "The marketing template is approved by Meta. Choose the message type.")}>
         <div className="acw-formats">
-          {WA_FORMAT_ORDER.map((f) => (
-            <button key={f} type="button" className={`acw-format${format === f ? " on" : ""}`}
-              disabled={disabled} onClick={() => api.update({ wa_format: f })}>
-              <span className="acw-format-label">{WA_FORMAT_META[f].label}</span>
-              <span className="acw-format-hint">{WA_FORMAT_META[f].hint}</span>
-            </button>
-          ))}
-          <button type="button" className="acw-format" disabled title="Требуется каталог товаров Meta">
-            <span className="acw-format-label">Каталог товаров</span>
-            <span className="acw-format-ratio">Скоро</span>
-            <span className="acw-format-hint">Товары из каталога Meta</span>
+          {WA_FORMAT_ORDER.map((f) => {
+            const meta = waFormatMeta(f);
+            return (
+              <button key={f} type="button" className={`acw-format${format === f ? " on" : ""}`}
+                disabled={disabled} onClick={() => api.update({ wa_format: f })}>
+                <span className="acw-format-label">{meta.label}</span>
+                <span className="acw-format-hint">{meta.hint}</span>
+              </button>
+            );
+          })}
+          <button type="button" className="acw-format" disabled title={t("Требуется каталог товаров Meta", "Requires a Meta product catalog")}>
+            <span className="acw-format-label">{t("Каталог товаров", "Product catalog")}</span>
+            <span className="acw-format-ratio">{t("Скоро", "Soon")}</span>
+            <span className="acw-format-hint">{t("Товары из каталога Meta", "Products from the Meta catalog")}</span>
           </button>
         </div>
       </Field>
 
-      <Field label="Содержание" hint="Текст и до 2 кнопок на карточку. Соберите автоматически или отредактируйте вручную.">
+      <Field label={t("Содержание", "Content")} hint={t("Текст и до 2 кнопок на карточку. Соберите автоматически или отредактируйте вручную.", "Text and up to 2 buttons per card. Build automatically or edit manually.")}>
         <div className="acw-gen-row">
           <div className="acw-tone">
-            {TONES.map((t) => (
-              <button key={t.id} type="button" className={`acw-tone-chip${tone === t.id ? " on" : ""}`}
-                disabled={disabled} onClick={() => setTone(t.id)}>{t.label}</button>
+            {tones().map((tn) => (
+              <button key={tn.id} type="button" className={`acw-tone-chip${tone === tn.id ? " on" : ""}`}
+                disabled={disabled} onClick={() => setTone(tn.id)}>{tn.label}</button>
             ))}
           </div>
           <button type="button" className="acw-btn acw-btn-primary acw-gen-btn" disabled={disabled} onClick={generate}>
@@ -1427,31 +1494,31 @@ function WhatsAppCreativeStep({ draft, api }: { draft: CampaignDraft; api: Wizar
             ))}
             {isCarousel && wa.cards.length < WA_MAX_CARDS && (
               <button type="button" className="acw-wa-add-card" disabled={disabled} onClick={() => api.update({ wa_add_card: {} })}>
-                ＋ Добавить карточку
+                ＋ {t("Добавить карточку", "Add card")}
               </button>
             )}
             {!isCarousel && wa.cards.length === 0 && (
               <button type="button" className="acw-wa-add-card" disabled={disabled} onClick={() => api.update({ wa_add_card: {} })}>
-                ＋ Создать сообщение
+                ＋ {t("Создать сообщение", "Create message")}
               </button>
             )}
           </div>
           <div className="acw-wa-preview-wrap">
-            <div className="acw-wa-preview-cap">Превью</div>
+            <div className="acw-wa-preview-cap">{t("Превью", "Preview")}</div>
             <WhatsAppPreview draft={draft} />
           </div>
         </div>
       </Field>
 
-      <Field label="Автоответы бота" hint="Когда абонент отвечает или жмёт кнопку, бот оператора продолжает диалог бесплатно (24 ч).">
+      <Field label={t("Автоответы бота", "Bot auto-replies")} hint={t("Когда абонент отвечает или жмёт кнопку, бот оператора продолжает диалог бесплатно (24 ч).", "When the subscriber replies or taps a button, the operator's bot continues the conversation for free (24h).")}>
         <div className="acw-toggle-row">
-          <span>Включить автоответ</span>
+          <span>{t("Включить автоответ", "Enable auto-reply")}</span>
           <Toggle on={wa.auto_reply_enabled} onClick={() => api.update({ toggle_wa_auto_reply: true })} disabled={disabled} />
         </div>
         {wa.auto_reply_enabled && (
           <div className="acw-sub-field">
             <EditableText value={wa.auto_reply_greeting} multiline disabled={disabled}
-              placeholder="Приветствие бота — например: «Здравствуйте! Расскажу подробнее об акции.»"
+              placeholder={t("Приветствие бота — например: «Здравствуйте! Расскажу подробнее об акции.»", "Bot greeting — e.g. “Hi! Let me tell you more about the offer.”")}
               onCommit={(v) => api.update({ wa_greeting: v })} />
           </div>
         )}
@@ -1474,19 +1541,19 @@ function MessageStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   };
   return (
     <>
-      <Field label="Отправитель">
-        <EditableText value={m.sender} placeholder="Имя отправителя" onCommit={(v) => api.update({ sender: v })} disabled={busy} />
+      <Field label={t("Отправитель", "Sender")}>
+        <EditableText value={m.sender} placeholder={t("Имя отправителя", "Sender name")} onCommit={(v) => api.update({ sender: v })} disabled={busy} />
       </Field>
-      <Field label="Текст сообщения" hint="Выберите тон и сгенерируйте варианты — затем выберите лучший или впишите свой.">
+      <Field label={t("Текст сообщения", "Message text")} hint={t("Выберите тон и сгенерируйте варианты — затем выберите лучший или впишите свой.", "Pick a tone and generate variants — then choose the best one or write your own.")}>
         <div className="acw-gen-row">
           <div className="acw-tone">
-            {TONES.map((t) => (
-              <button key={t.id} type="button" className={`acw-tone-chip${tone === t.id ? " on" : ""}`}
-                disabled={busy} onClick={() => setTone(t.id)}>{t.label}</button>
+            {tones().map((tn) => (
+              <button key={tn.id} type="button" className={`acw-tone-chip${tone === tn.id ? " on" : ""}`}
+                disabled={busy} onClick={() => setTone(tn.id)}>{tn.label}</button>
             ))}
           </div>
           <button type="button" className="acw-btn acw-btn-primary acw-gen-btn" disabled={busy} onClick={genCopy}>
-            {genBusy ? <Spinner /> : "✦"} Сгенерировать варианты
+            {genBusy ? <Spinner /> : "✦"} {t("Сгенерировать варианты", "Generate variants")}
           </button>
         </div>
         {m.variants.length > 0 && (
@@ -1496,7 +1563,7 @@ function MessageStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
               return (
                 <button key={i} type="button" className={`acw-copy-card${selected ? " on" : ""}`}
                   disabled={busy} onClick={() => api.update({ message_text: v })}>
-                  <span className="acw-copy-card-badge">{selected ? "✓ Выбран" : `Вариант ${i + 1}`}</span>
+                  <span className="acw-copy-card-badge">{selected ? t("✓ Выбран", "✓ Selected") : `${t("Вариант", "Variant")} ${i + 1}`}</span>
                   <span className="acw-copy-card-text">{v}</span>
                 </button>
               );
@@ -1504,7 +1571,7 @@ function MessageStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
           </div>
         )}
         <div className="acw-sub-field">
-          <EditableText value={m.text} placeholder="Текст сообщения — выберите вариант выше или впишите свой…"
+          <EditableText value={m.text} placeholder={t("Текст сообщения — выберите вариант выше или впишите свой…", "Message text — pick a variant above or write your own…")}
             onCommit={(v) => api.update({ message_text: v })} multiline disabled={busy} />
         </div>
       </Field>
@@ -1520,10 +1587,10 @@ function CostStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
   const whatsapp = draft.channel === "whatsapp";
   return (
     <>
-      <Field label="Бюджет">
+      <Field label={t("Бюджет", "Budget")}>
         <EditableText
           value={c.budget != null ? String(c.budget) : null}
-          placeholder="Бюджет кампании, ₽"
+          placeholder={t("Бюджет кампании, ₽", "Campaign budget, ₽")}
           type="number"
           suffix="₽"
           onCommit={(v) => api.update({ budget: v })}
@@ -1531,30 +1598,30 @@ function CostStep({ draft, api }: { draft: CampaignDraft; api: WizardApi }) {
         />
         {network ? (
           draft.estimated_impressions > 0 && (
-            <div className="acw-hint">≈ {fmt(draft.estimated_impressions)} показов при CPM {draft.cpm} ₽</div>
+            <div className="acw-hint">≈ {fmt(draft.estimated_impressions)} {t("показов при CPM", "impressions at CPM")} {draft.cpm} ₽</div>
           )
         ) : (
           <div className="acw-sub-field">
             <EditableText
               value={c.messages_count != null ? String(c.messages_count) : null}
-              placeholder={whatsapp ? "Число диалогов" : "Число сообщений"}
+              placeholder={whatsapp ? t("Число диалогов", "Number of conversations") : t("Число сообщений", "Number of messages")}
               type="number"
               onCommit={(v) => api.update({ messages_count: v })}
               disabled={api.busy}
             />
             {whatsapp && (
-              <div className="acw-hint">Платится открытие диалога ({draft.price_per_message} ₽); дальнейшая переписка с ботом — бесплатно.</div>
+              <div className="acw-hint">{t("Платится открытие диалога", "You pay to open the conversation")} ({draft.price_per_message} ₽); {t("дальнейшая переписка с ботом — бесплатно.", "further chat with the bot is free.")}</div>
             )}
           </div>
         )}
       </Field>
-      <Field label="Условия кампании">
+      <Field label={t("Условия кампании", "Campaign terms")}>
         <div className="acw-two-col">
-          <div className="acw-input-mock">{c.start_date || <span className="acw-placeholder">Дата начала</span>}</div>
-          <div className="acw-input-mock">{c.end_date || <span className="acw-placeholder">Дата окончания</span>}</div>
+          <div className="acw-input-mock">{c.start_date || <span className="acw-placeholder">{t("Дата начала", "Start date")}</span>}</div>
+          <div className="acw-input-mock">{c.end_date || <span className="acw-placeholder">{t("Дата окончания", "End date")}</span>}</div>
         </div>
-        <div className="acw-toggle-row"><span>Равномерное распределение</span><span className={`acw-toggle${c.uniform_distribution ? " on" : ""}`} /></div>
-        <div className="acw-toggle-row"><span>Автозапуск</span><span className={`acw-toggle${c.autorun ? " on" : ""}`} /></div>
+        <div className="acw-toggle-row"><span>{t("Равномерное распределение", "Even distribution")}</span><span className={`acw-toggle${c.uniform_distribution ? " on" : ""}`} /></div>
+        <div className="acw-toggle-row"><span>{t("Автозапуск", "Auto-start")}</span><span className={`acw-toggle${c.autorun ? " on" : ""}`} /></div>
       </Field>
     </>
   );
@@ -1567,68 +1634,67 @@ function ConfirmationStep({ draft }: { draft: CampaignDraft }) {
   const network = isNetworkChannel(draft.channel);
   const whatsapp = draft.channel === "whatsapp";
   const rows: Array<[string, string]> = [
-    ["Канал", channelLabel(draft.channel)],
-    ["Локации", s.geography.join(", ") || "Россия"],
-    ["Пол", DEMOGRAPHICS_LABEL[s.demographics] ?? s.demographics],
-    ["Возраст", s.age.join(", ") || "—"],
-    ["Интересы", mapInterests(s.interests).join(", ") || "—"],
+    [t("Канал", "Channel"), channelLabel(draft.channel)],
+    [t("Локации", "Locations"), s.geography.join(", ") || t("Россия", "Russia")],
+    [t("Пол", "Gender"), demographicsLabel(s.demographics)],
+    [t("Возраст", "Age"), s.age.join(", ") || "—"],
+    [t("Интересы", "Interests"), mapInterests(s.interests).join(", ") || "—"],
   ];
   if (network) {
     const placements = draft.meta.placements.map((p) => PLACEMENT_LABEL[p] ?? p).join(", ");
-    rows.push(["Цель", OBJECTIVE_LABEL[draft.meta.objective] ?? draft.meta.objective]);
-    rows.push(["Формат", FORMAT_META[draft.meta.creative.format]?.label ?? draft.meta.creative.format]);
-    rows.push(["Плейсменты", placements || "Facebook, Instagram"]);
-    rows.push(["Похожая аудитория", draft.meta.lookalike ? "Да" : "Нет"]);
+    rows.push([t("Цель", "Objective"), objectiveLabel(draft.meta.objective)]);
+    rows.push([t("Формат", "Format"), formatMeta(draft.meta.creative.format).label]);
+    rows.push([t("Плейсменты", "Placements"), placements || "Facebook, Instagram"]);
+    rows.push([t("Похожая аудитория", "Lookalike audience"), draft.meta.lookalike ? t("Да", "Yes") : t("Нет", "No")]);
     rows.push(["Custom Audience", fmt(draft.audience_reach)]);
     rows.push(["CPM", `${draft.cpm} ₽`]);
-    rows.push(["Ожидаемые показы", fmt(draft.estimated_impressions)]);
+    rows.push([t("Ожидаемые показы", "Expected impressions"), fmt(draft.estimated_impressions)]);
   } else if (whatsapp) {
     const wa = draft.whatsapp;
     const waFormat: WhatsAppFormat = wa.format ?? "carousel";
-    rows.push(["Отправитель", wa.sender_mode === "dedicated" ? (wa.sender_name || "Выделенный") : "AdConnect Promo (общий)"]);
-    rows.push(["Формат", WA_FORMAT_META[waFormat].label]);
-    if (waFormat === "carousel") rows.push(["Карточек", String(wa.cards.length)]);
-    rows.push(["Автоответы бота", wa.auto_reply_enabled ? "Включены" : "Нет"]);
-    rows.push(["Достижимо в WhatsApp", fmt(draft.audience_reach)]);
-    rows.push(["Цена за диалог", `${draft.price_per_message} ₽`]);
+    rows.push([t("Формат", "Format"), waFormatMeta(waFormat).label]);
+    if (waFormat === "carousel") rows.push([t("Карточек", "Cards"), String(wa.cards.length)]);
+    rows.push([t("Автоответы бота", "Bot auto-replies"), wa.auto_reply_enabled ? t("Включены", "On") : t("Нет", "Off")]);
+    rows.push([t("Достижимо в WhatsApp", "Reachable on WhatsApp"), fmt(draft.audience_reach)]);
+    rows.push([t("Цена за диалог", "Price per conversation"), `${draft.price_per_message} ₽`]);
   } else {
-    rows.push(["Доход", s.monthly_income || "—"]);
+    rows.push([t("Доход", "Income"), s.monthly_income || "—"]);
   }
   const creative = draft.meta.creative;
   return (
     <>
-      <div className="acw-section-title">Параметры аудитории</div>
+      <div className="acw-section-title">{t("Параметры аудитории", "Audience parameters")}</div>
       <div className="acw-summary">
         {rows.map(([k, v]) => (
           <div key={k} className="acw-summary-row"><span>{k}</span><span>{v}</span></div>
         ))}
       </div>
       {network && creative.media_url && (
-        <Field label="Креатив">
+        <Field label={t("Креатив", "Creative")}>
           <div className="acw-confirm-creative">
             {isVideoFile(creative.media_url)
               ? <video src={creative.media_url} className="acw-confirm-thumb" muted loop autoPlay playsInline />
               : <img src={creative.media_url} className="acw-confirm-thumb" alt="creative" />}
             <div className="acw-confirm-creative-meta">
-              <div>{FORMAT_META[creative.format]?.label} · {FORMAT_META[creative.format]?.ratio}</div>
-              <div className="acw-hint">{creative.media_source === "generated" ? "Сгенерировано" : "Загружено"}</div>
+              <div>{formatMeta(creative.format).label} · {formatMeta(creative.format).ratio}</div>
+              <div className="acw-hint">{creative.media_source === "generated" ? t("Сгенерировано", "Generated") : t("Загружено", "Uploaded")}</div>
             </div>
           </div>
         </Field>
       )}
       {whatsapp && draft.whatsapp.cards.length > 0 && (
-        <Field label="Креатив">
+        <Field label={t("Креатив", "Creative")}>
           <WhatsAppPreview draft={draft} />
         </Field>
       )}
-      <Field label="Название кампании">
-        <div className="acw-input-mock">{draft.name || <span className="acw-placeholder">Название</span>}</div>
+      <Field label={t("Название кампании", "Campaign name")}>
+        <div className="acw-input-mock">{draft.name || <span className="acw-placeholder">{t("Название", "Name")}</span>}</div>
       </Field>
       {draft.message.text && (
-        <Field label="Сообщение"><div className="acw-textarea-mock">{draft.message.text}</div></Field>
+        <Field label={t("Сообщение", "Message")}><div className="acw-textarea-mock">{draft.message.text}</div></Field>
       )}
       {draft.status === "submitted" && (
-        <div className="acw-submitted">✓ Отправлено на модерацию</div>
+        <div className="acw-submitted">{t("✓ Отправлено на модерацию", "✓ Submitted for moderation")}</div>
       )}
     </>
   );
@@ -1668,14 +1734,14 @@ export function CampaignWizard({ draft }: { draft: CampaignDraft }) {
     if (step === "brief" && !draft.brief_confirmed) updateDraft({ brief_confirmed: true });
     setViewStep(STEP_ORDER[idx + 1]);
   };
-  const submit = () => void sendMessage("", { id: "submit_campaign", label: "Отправить на модерацию", kind: "primary", payload: {} });
+  const submit = () => void sendMessage("", { id: "submit_campaign", label: t("Отправить на модерацию", "Submit for moderation"), kind: "primary", payload: {} });
 
   return (
     <div className="acw">
       <div className="acw-titlebar">
         <span className="acw-titlebar-left">
-          <button type="button" className="acw-back" onClick={stopCreating}>← К кампаниям</button>
-          <span>{submitted ? draft.name || "Рекламная кампания" : "Создание рекламной кампании"}</span>
+          <button type="button" className="acw-back" onClick={stopCreating}>← {t("К кампаниям", "Back to campaigns")}</button>
+          <span>{submitted ? draft.name || t("Рекламная кампания", "Ad campaign") : t("Создание рекламной кампании", "Create an ad campaign")}</span>
         </span>
         <span className="acw-titlebar-actions">⧉ 🗑</span>
       </div>
@@ -1690,7 +1756,7 @@ export function CampaignWizard({ draft }: { draft: CampaignDraft }) {
       <div className="acw-nav">
         {idx > 0 && !submitted && (
           <button className="acw-btn acw-btn-ghost" type="button" onClick={() => setViewStep(STEP_ORDER[idx - 1])}>
-            Назад
+            {t("Назад", "Back")}
           </button>
         )}
         {isLast ? (
@@ -1700,17 +1766,17 @@ export function CampaignWizard({ draft }: { draft: CampaignDraft }) {
             disabled={submitted || sending}
             onClick={submit}
           >
-            {submitted ? "Отправлено" : "Отправить на модерацию"}
+            {submitted ? t("Отправлено", "Submitted") : t("Отправить на модерацию", "Submit for moderation")}
           </button>
         ) : (
           <button
             className="acw-btn acw-btn-primary"
             type="button"
             disabled={sending || briefBlocked}
-            title={briefBlocked ? "Укажите, что рекламируем" : undefined}
+            title={briefBlocked ? t("Укажите, что рекламируем", "Specify what you're advertising") : undefined}
             onClick={onContinue}
           >
-            Продолжить
+            {t("Продолжить", "Continue")}
           </button>
         )}
       </div>

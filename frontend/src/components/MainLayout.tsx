@@ -2,22 +2,24 @@ import { ChatWorkspaceProvider } from "../chat-workspace/store/chatWorkspaceStor
 import { AdConnectMock } from "./AdConnectMock";
 import { FloatingWidget } from "./FloatingWidget";
 import { AppErrorBoundary } from "./AppErrorBoundary";
+import { LangProvider, useLang } from "../i18n";
 
 function MainLayoutInner() {
+  const { t } = useLang();
   return (
-    <>
+    <AppErrorBoundary title={t("Ошибка интерфейса", "Interface error")}>
       <AdConnectMock />
       <FloatingWidget />
-    </>
+    </AppErrorBoundary>
   );
 }
 
 export function MainLayout() {
   return (
-    <ChatWorkspaceProvider>
-      <AppErrorBoundary title="Ошибка интерфейса">
+    <LangProvider>
+      <ChatWorkspaceProvider>
         <MainLayoutInner />
-      </AppErrorBoundary>
-    </ChatWorkspaceProvider>
+      </ChatWorkspaceProvider>
+    </LangProvider>
   );
 }

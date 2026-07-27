@@ -6,29 +6,35 @@ import {
 import type { ChatAction, ChatTraceEvent, ChatSession } from "../api/chatApi";
 import { MarkdownText } from "./MarkdownText";
 import { Sources } from "./Sources";
+import { t } from "../i18n";
 
 type WidgetMode = "fab" | "panel" | "expanded";
 type HistoryMode = "closed" | "open";
 
-const SUGGESTIONS: { label: string; prompt: string }[] = [
-  { label: "Создать рекламную кампанию", prompt: "Создай рекламную кампанию для моего бизнеса" },
-  { label: "Подобрать аудиторию", prompt: "Подбери аудиторию для моей кампании" },
-  { label: "Сгенерировать креатив", prompt: "Сгенерируй варианты текста для моего объявления" },
-  { label: "Рассчитать охват и бюджет", prompt: "Помоги рассчитать охват и бюджет кампании" },
-  { label: "Вопрос по платформе", prompt: "Как создать рекламную кампанию в AdConnect?" },
-];
+function suggestions(): { label: string; prompt: string }[] {
+  return [
+    { label: t("Создать рекламную кампанию", "Create an ad campaign"), prompt: t("Создай рекламную кампанию для моего бизнеса", "Create an ad campaign for my business") },
+    { label: t("Подобрать аудиторию", "Pick an audience"), prompt: t("Подбери аудиторию для моей кампании", "Pick an audience for my campaign") },
+    { label: t("Сгенерировать креатив", "Generate a creative"), prompt: t("Сгенерируй варианты текста для моего объявления", "Generate copy variants for my ad") },
+    { label: t("Рассчитать охват и бюджет", "Estimate reach and budget"), prompt: t("Помоги рассчитать охват и бюджет кампании", "Help me estimate the campaign's reach and budget") },
+    { label: t("Вопрос по платформе", "Ask about the platform"), prompt: t("Как создать рекламную кампанию в AdConnect?", "How do I create an ad campaign in AdConnect?") },
+  ];
+}
 
-const ACTION_LABELS: Record<string, string> = {
-  save_campaign: "Сохранить кампанию",
-  save_segment: "Сохранить сегмент",
-  save_target_group: "Сохранить таргет-группу",
-  apply_segment: "Применить сегмент",
-  build_campaign_from_segment: "Создать кампанию из сегмента",
-  refine_campaign: "Доработать",
-  open_artifact: "Открыть артефакт",
-  start_campaign: "Запустить кампанию",
-  pause_campaign: "Поставить на паузу",
-};
+function actionLabel(id: string): string | undefined {
+  switch (id) {
+    case "save_campaign": return t("Сохранить кампанию", "Save campaign");
+    case "save_segment": return t("Сохранить сегмент", "Save segment");
+    case "save_target_group": return t("Сохранить таргет-группу", "Save target group");
+    case "apply_segment": return t("Применить сегмент", "Apply segment");
+    case "build_campaign_from_segment": return t("Создать кампанию из сегмента", "Create campaign from segment");
+    case "refine_campaign": return t("Доработать", "Refine");
+    case "open_artifact": return t("Открыть артефакт", "Open artifact");
+    case "start_campaign": return t("Запустить кампанию", "Start campaign");
+    case "pause_campaign": return t("Поставить на паузу", "Pause");
+    default: return undefined;
+  }
+}
 
 function formatTime(value: string | null | undefined): string {
   if (!value) return "";
@@ -46,15 +52,21 @@ function isSameDay(left: Date, right: Date): boolean {
 function groupSessions(sessions: ChatSession[]): { label: string; items: ChatSession[] }[] {
   const now = new Date();
   const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
-  const groups: { [key: string]: ChatSession[] } = { "Сегодня": [], "Вчера": [], "Ранее": [] };
+  const today: ChatSession[] = [];
+  const yday: ChatSession[] = [];
+  const earlier: ChatSession[] = [];
   for (const s of sessions) {
     const d = s.updatedAt ? new Date(s.updatedAt) : null;
-    if (!d || Number.isNaN(d.getTime())) groups["Ранее"].push(s);
-    else if (isSameDay(d, now)) groups["Сегодня"].push(s);
-    else if (isSameDay(d, yesterday)) groups["Вчера"].push(s);
-    else groups["Ранее"].push(s);
+    if (!d || Number.isNaN(d.getTime())) earlier.push(s);
+    else if (isSameDay(d, now)) today.push(s);
+    else if (isSameDay(d, yesterday)) yday.push(s);
+    else earlier.push(s);
   }
-  return Object.entries(groups).filter(([, v]) => v.length > 0).map(([label, items]) => ({ label, items }));
+  return [
+    { label: t("Сегодня", "Today"), items: today },
+    { label: t("Вчера", "Yesterday"), items: yday },
+    { label: t("Ранее", "Earlier"), items: earlier },
+  ].filter((g) => g.items.length > 0);
 }
 
 // ── SVG icons ────────────────────────────────────────────────────────────────
@@ -118,7 +130,7 @@ function PlanCard({ trace }: { trace: ChatTraceEvent[] | undefined }) {
   if (visible.length === 0) return null;
   return (
     <details className="fw-plan">
-      <summary>План вызова агентов · {visible.length} шагов</summary>
+      <summary>{t("План вызова агентов", "Agent invocation plan")} · {visible.length} {t("шагов", "steps")}</summary>
       <div className="fw-plan-steps">
         {visible.map((e, i) => (
           <div key={i} className={`fw-plan-step ${e.status}`}>
@@ -152,14 +164,14 @@ function ActionCards({
     <>
       {saveActions.length > 0 && (
         <div className="fw-action-card">
-          <div className="fw-action-card-title">Предлагаемые сохранения</div>
+          <div className="fw-action-card-title">{t("Предлагаемые сохранения", "Suggested saves")}</div>
           <div className="fw-action-card-body">
-            Агент подготовил артефакт. Сохраните его, чтобы переиспользовать в следующих шагах.
+            {t("Агент подготовил артефакт. Сохраните его, чтобы переиспользовать в следующих шагах.", "The agent prepared an artifact. Save it to reuse in the next steps.")}
           </div>
           <div className="fw-action-card-buttons">
             {saveActions.map((a) => (
               <button key={a.id} className="primary" disabled={pending} onClick={() => onAct(a)}>
-                {ACTION_LABELS[a.id] ?? a.label}
+                {actionLabel(a.id) ?? a.label}
               </button>
             ))}
           </div>
@@ -169,7 +181,7 @@ function ActionCards({
         <div className="fw-quick-actions">
           {otherActions.map((a) => (
             <button key={`${a.id}-${a.label}`} disabled={pending} onClick={() => onAct(a)} className="fw-quick-action">
-              {a.label || ACTION_LABELS[a.id] || a.id}
+              {a.label || actionLabel(a.id) || a.id}
             </button>
           ))}
         </div>
@@ -199,9 +211,9 @@ function MessageBubble({ msg, onAction, pending, isLast }: { msg: ChatEntry; onA
 function ThreadEmpty({ onPick }: { onPick: (prompt: string) => void }) {
   return (
     <div className="fw-thread-empty">
-      <div className="fw-thread-empty-hint">Спросите про кампании, сегменты, документацию.</div>
+      <div className="fw-thread-empty-hint">{t("Спросите про кампании, сегменты, документацию.", "Ask about campaigns, segments, documentation.")}</div>
       <div className="fw-suggestion-grid">
-        {SUGGESTIONS.map((s) => (
+        {suggestions().map((s) => (
           <button key={s.label} className="fw-suggestion" onClick={() => onPick(s.prompt)}>
             {s.label}
           </button>
@@ -241,17 +253,17 @@ function HistoryPanel({
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Поиск по диалогам"
+          placeholder={t("Поиск по диалогам", "Search conversations")}
         />
-        <button className="fw-btn-primary" onClick={onNew}>+ Новый</button>
-        <button className="fw-icon-btn" title="Закрыть историю" onClick={onClose}><CloseIcon /></button>
+        <button className="fw-btn-primary" onClick={onNew}>+ {t("Новый", "New")}</button>
+        <button className="fw-icon-btn" title={t("Закрыть историю", "Close history")} onClick={onClose}><CloseIcon /></button>
       </div>
       <div className="fw-history-list">
         {loading && sessions.length === 0 && (
-          <div className="fw-history-empty">Загрузка…</div>
+          <div className="fw-history-empty">{t("Загрузка…", "Loading…")}</div>
         )}
         {!loading && groups.length === 0 && (
-          <div className="fw-history-empty">История диалогов пуста</div>
+          <div className="fw-history-empty">{t("История диалогов пуста", "No conversations yet")}</div>
         )}
         {groups.map((g) => (
           <div key={g.label}>
@@ -262,7 +274,7 @@ function HistoryPanel({
                 className={`fw-history-item ${s.id === activeId ? "active" : ""}`}
                 onClick={() => onSelect(s.id)}
               >
-                <div className="fw-history-item-title">{s.title || "Без названия"}</div>
+                <div className="fw-history-item-title">{s.title || t("Без названия", "Untitled")}</div>
                 {s.lastMessagePreview && (
                   <div className="fw-history-item-preview">{s.lastMessagePreview}</div>
                 )}
@@ -380,7 +392,7 @@ export function FloatingWidget() {
       setView("analytics", typeof cid === "number" ? cid : null);
       return;
     }
-    const label = ACTION_LABELS[action.id] ?? action.label;
+    const label = actionLabel(action.id) ?? action.label;
     void sendMessage(label, action);
   };
 
@@ -407,7 +419,7 @@ export function FloatingWidget() {
         <button
           className="fw-fab"
           onClick={() => setMode("panel")}
-          aria-label="Открыть AdConnect Copilot"
+          aria-label={t("Открыть AdConnect Copilot", "Open AdConnect Copilot")}
           title="AdConnect Copilot"
         >
           <ChatIcon />
@@ -426,8 +438,8 @@ export function FloatingWidget() {
         {showSideHistory && (
           <aside className="fw-side-history">
             <div className="fw-side-history-header">
-              <span>История</span>
-              <button className="fw-btn-primary" onClick={() => void handleNewChat()}>+ Новый</button>
+              <span>{t("История", "History")}</span>
+              <button className="fw-btn-primary" onClick={() => void handleNewChat()}>+ {t("Новый", "New")}</button>
             </div>
             <SideHistoryList
               sessions={sessions}
@@ -443,7 +455,7 @@ export function FloatingWidget() {
             {isExpanded ? (
               <button
                 className={`fw-icon-btn ${expandedSideOpen ? "active" : ""}`}
-                title={expandedSideOpen ? "Свернуть историю диалогов" : "Показать историю диалогов"}
+                title={expandedSideOpen ? t("Свернуть историю диалогов", "Collapse conversation history") : t("Показать историю диалогов", "Show conversation history")}
                 onClick={() => setExpandedSideOpen(v => !v)}
               >
                 <HistoryIcon />
@@ -451,31 +463,31 @@ export function FloatingWidget() {
             ) : (
               <button
                 className={`fw-icon-btn ${history === "open" ? "active" : ""}`}
-                title="История диалогов"
+                title={t("История диалогов", "Conversation history")}
                 onClick={() => setHistory(history === "open" ? "closed" : "open")}
               >
                 <HistoryIcon />
               </button>
             )}
             <div className="fw-header-title">AdConnect Copilot</div>
-            <button className="fw-icon-btn" title="Новый диалог" onClick={() => void handleNewChat()}>
+            <button className="fw-icon-btn" title={t("Новый диалог", "New conversation")} onClick={() => void handleNewChat()}>
               <PlusIcon />
             </button>
             <button
               className="fw-icon-btn"
-              title={isExpanded ? "Свернуть до компактного режима" : "Развернуть"}
+              title={isExpanded ? t("Свернуть до компактного режима", "Collapse to compact mode") : t("Развернуть", "Expand")}
               onClick={() => setMode(isExpanded ? "panel" : "expanded")}
             >
               {isExpanded ? <CompressIcon /> : <ExpandIcon />}
             </button>
-            <button className="fw-icon-btn" title="Свернуть" onClick={() => setMode("fab")}>
+            <button className="fw-icon-btn" title={t("Свернуть", "Minimize")} onClick={() => setMode("fab")}>
               <MinimizeIcon />
             </button>
           </header>
 
           <div className="fw-thread" ref={threadRef}>
             {loadingMessages && messages.length === 0 ? (
-              <div className="fw-thread-empty">Загрузка…</div>
+              <div className="fw-thread-empty">{t("Загрузка…", "Loading…")}</div>
             ) : messages.length === 0 ? (
               <ThreadEmpty onPick={handlePickSuggestion} />
             ) : (
@@ -489,7 +501,7 @@ export function FloatingWidget() {
                 />
               ))
             )}
-            {sending && <div className="fw-typing">Ассистент думает…</div>}
+            {sending && <div className="fw-typing">{t("Ассистент думает…", "Assistant is thinking…")}</div>}
           </div>
 
           {error && <div className="fw-error">{error}</div>}
@@ -500,9 +512,9 @@ export function FloatingWidget() {
               onChange={setInput}
               onSubmit={() => void handleSend()}
               disabled={false}
-              placeholder="Спросите про кампании, сегменты или документацию…"
+              placeholder={t("Спросите про кампании, сегменты или документацию…", "Ask about campaigns, segments or documentation…")}
             />
-            <button onClick={() => void handleSend()} disabled={sending || !input.trim()} title="Отправить">
+            <button onClick={() => void handleSend()} disabled={sending || !input.trim()} title={t("Отправить", "Send")}>
               <SendIcon />
             </button>
           </div>
@@ -550,11 +562,11 @@ function SideHistoryList({
         className="fw-side-history-search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Поиск по диалогам"
+        placeholder={t("Поиск по диалогам", "Search conversations")}
       />
       <div className="fw-side-history-list">
-        {loading && sessions.length === 0 && <div className="fw-history-empty">Загрузка…</div>}
-        {!loading && groups.length === 0 && <div className="fw-history-empty">Диалогов нет</div>}
+        {loading && sessions.length === 0 && <div className="fw-history-empty">{t("Загрузка…", "Loading…")}</div>}
+        {!loading && groups.length === 0 && <div className="fw-history-empty">{t("Диалогов нет", "No conversations")}</div>}
         {groups.map((g) => (
           <div key={g.label}>
             <div className="fw-history-group-title">{g.label}</div>
@@ -564,7 +576,7 @@ function SideHistoryList({
                 className={`fw-history-item ${s.id === activeId ? "active" : ""}`}
                 onClick={() => onSelect(s.id)}
               >
-                <div className="fw-history-item-title">{s.title || "Без названия"}</div>
+                <div className="fw-history-item-title">{s.title || t("Без названия", "Untitled")}</div>
                 {s.lastMessagePreview && (
                   <div className="fw-history-item-preview">{s.lastMessagePreview}</div>
                 )}

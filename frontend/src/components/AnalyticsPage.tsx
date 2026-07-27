@@ -13,6 +13,7 @@ import {
   getCampaignAnalytics,
 } from "../api/chatApi";
 import { useChatWorkspaceStore } from "../chat-workspace/store/chatWorkspaceStore";
+import { t } from "../i18n";
 import type {
   AnalyticsSummary,
   CampaignAnalytics,
@@ -29,16 +30,22 @@ const PLATFORM_COLOR: Record<string, string> = {
   facebook: "#1877F2", instagram: "#E4405F", whatsapp: "#25D366",
   messenger: "#A033FF", audience_network: "#0866FF",
 };
-const OBJECTIVE_LABEL: Record<string, string> = {
-  awareness: "Узнаваемость", traffic: "Трафик", engagement: "Вовлечённость",
-  leads: "Лиды", sales: "Продажи",
-};
+function objectiveLabel(o: string): string {
+  switch (o) {
+    case "awareness": return t("Узнаваемость", "Awareness");
+    case "traffic": return t("Трафик", "Traffic");
+    case "engagement": return t("Вовлечённость", "Engagement");
+    case "leads": return t("Лиды", "Leads");
+    case "sales": return t("Продажи", "Sales");
+    default: return o;
+  }
+}
 const CHANNEL_LABEL: Record<string, string> = { sms: "SMS", email: "Email", meta: "Meta", whatsapp: "WhatsApp" };
 const CHANNEL_COLOR: Record<string, string> = {
   meta: "#5257ff", sms: "#0ea5e9", email: "#f59e0b", whatsapp: "#25D366", other: "#94a3b8",
 };
 
-const num = (n: number) => n.toLocaleString("ru-RU").replace(/,/g, " ");
+const num = (n: number) => n.toLocaleString("ru-RU").replace(/,/g, " ");
 const money = (n: number) => `${num(Math.round(n))} ₽`;
 
 /** Delta chip vs previous period; colour respects whether up is good. */
@@ -72,7 +79,7 @@ function KpiCard({ label, value, sub, delta, betterWhenUp }: {
 function kfmt(v: number): string {
   if (v >= 1000) {
     const n = v / 1000;
-    return (n >= 10 ? String(Math.round(n)) : n.toFixed(1).replace(".", ",")) + "к";
+    return (n >= 10 ? String(Math.round(n)) : n.toFixed(1).replace(".", ",")) + t("к", "k");
   }
   return String(Math.round(v));
 }
@@ -85,13 +92,15 @@ function niceMax(v: number): number {
 }
 
 type TrendMetric = "impressions" | "clicks" | "spend" | "results" | "ctr";
-const TREND_METRICS: Array<{ id: TrendMetric; label: string; color: string; line?: boolean; pct?: boolean; money?: boolean }> = [
-  { id: "impressions", label: "Показы", color: "#6366f1" },
-  { id: "clicks", label: "Клики", color: "#22c55e" },
-  { id: "spend", label: "Расход", color: "#0ea5e9", money: true },
-  { id: "results", label: "Результаты", color: "#a855f7" },
-  { id: "ctr", label: "CTR", color: "#f59e0b", line: true, pct: true },
-];
+function trendMetrics(): Array<{ id: TrendMetric; label: string; color: string; line?: boolean; pct?: boolean; money?: boolean }> {
+  return [
+    { id: "impressions", label: t("Показы", "Impressions"), color: "#6366f1" },
+    { id: "clicks", label: t("Клики", "Clicks"), color: "#22c55e" },
+    { id: "spend", label: t("Расход", "Spend"), color: "#0ea5e9", money: true },
+    { id: "results", label: t("Результаты", "Results"), color: "#a855f7" },
+    { id: "ctr", label: "CTR", color: "#f59e0b", line: true, pct: true },
+  ];
+}
 
 /**
  * Daily-trend chart with a metric selector — each metric on its own properly
@@ -100,8 +109,9 @@ const TREND_METRICS: Array<{ id: TrendMetric; label: string; color: string; line
  */
 function TrendChart({ series, deltas }: { series: MetricPoint[]; deltas?: Record<string, number> }) {
   const [metric, setMetric] = useState<TrendMetric>("impressions");
-  if (series.length < 2) return <div className="ana-chart-empty">Недостаточно данных</div>;
-  const def = TREND_METRICS.find((m) => m.id === metric)!;
+  const metrics = trendMetrics();
+  if (series.length < 2) return <div className="ana-chart-empty">{t("Недостаточно данных", "Not enough data")}</div>;
+  const def = metrics.find((m) => m.id === metric)!;
   const valueOf = (p: MetricPoint) =>
     metric === "ctr" ? (p.impressions ? (p.clicks / p.impressions) * 100 : 0) : (p[metric] as number);
   const vals = series.map(valueOf);
@@ -125,13 +135,13 @@ function TrendChart({ series, deltas }: { series: MetricPoint[]; deltas?: Record
     <div className="ana-chart">
       <div className="ana-chart-head">
         <div className="ana-metric-tabs">
-          {TREND_METRICS.map((m) => (
+          {metrics.map((m) => (
             <button key={m.id} type="button" className={`ana-metric-tab${metric === m.id ? " on" : ""}`}
               onClick={() => setMetric(m.id)}>{m.label}</button>
           ))}
         </div>
         <div className="ana-chart-avg">
-          {def.label}: <b>{avgLabel}</b>/день <DeltaChip delta={deltas?.[metric]} betterWhenUp />
+          {def.label}: <b>{avgLabel}</b>/{t("день", "day")} <DeltaChip delta={deltas?.[metric]} betterWhenUp />
         </div>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="ana-chart-svg" role="img">
@@ -169,8 +179,8 @@ function Funnel({ impressions, clicks, results, resultLabel }: {
 }) {
   if (!impressions) return null;
   const stages = [
-    { label: "Показы", value: impressions, color: "#6366f1" },
-    { label: "Клики", value: clicks, color: "#22c55e" },
+    { label: t("Показы", "Impressions"), value: impressions, color: "#6366f1" },
+    { label: t("Клики", "Clicks"), value: clicks, color: "#22c55e" },
     { label: resultLabel, value: results, color: "#a855f7" },
   ];
   const ctr = impressions ? (clicks / impressions) * 100 : 0;
@@ -185,7 +195,7 @@ function Funnel({ impressions, clicks, results, resultLabel }: {
           </div>
           <div className="ana-funnel-label">{s.label}</div>
           {i < stages.length - 1 && (
-            <div className="ana-funnel-step">↓ {(i === 0 ? ctr : cr).toFixed(2)}% {i === 0 ? "CTR" : "конверсия в результат"}</div>
+            <div className="ana-funnel-step">↓ {(i === 0 ? ctr : cr).toFixed(2)}% {i === 0 ? "CTR" : t("конверсия в результат", "conversion to result")}</div>
           )}
         </div>
       ))}
@@ -203,7 +213,7 @@ function Demographics({ demographics }: { demographics: DemographicMetric[] }) {
     <div className="ana-demo">
       {ages.length > 0 && (
         <div className="ana-demo-block">
-          <div className="ana-demo-title">Возраст</div>
+          <div className="ana-demo-title">{t("Возраст", "Age")}</div>
           {ages.map((a) => (
             <div key={a.label} className="ana-demo-row">
               <span className="ana-demo-key">{a.label}</span>
@@ -215,7 +225,7 @@ function Demographics({ demographics }: { demographics: DemographicMetric[] }) {
       )}
       {genders.length > 0 && (
         <div className="ana-demo-block">
-          <div className="ana-demo-title">Пол</div>
+          <div className="ana-demo-title">{t("Пол", "Gender")}</div>
           <div className="ana-gender">
             {genders.map((g) => (
               <div key={g.label} className="ana-gender-seg" style={{ width: `${g.share}%`, background: g.label === "Мужчины" ? "#0ea5e9" : "#ec4899" }}>
@@ -272,7 +282,7 @@ function ChannelDonut({ channels }: { channels: ChannelMetric[] }) {
           ))}
         </g>
         <text x="70" y="66" textAnchor="middle" className="ana-donut-num">{channels.length}</text>
-        <text x="70" y="84" textAnchor="middle" className="ana-donut-cap">канала</text>
+        <text x="70" y="84" textAnchor="middle" className="ana-donut-cap">{t("канала", "channels")}</text>
       </svg>
       <div className="ana-channel-legend">
         {channels.map((c) => (
@@ -282,7 +292,7 @@ function ChannelDonut({ channels }: { channels: ChannelMetric[] }) {
               {c.label}
             </span>
             <span className="ana-channel-share">{c.share}%</span>
-            <span className="ana-channel-val">{money(c.spend)} · {c.campaign_count} камп. · {num(c.results)} рез.</span>
+            <span className="ana-channel-val">{money(c.spend)} · {c.campaign_count} {t("камп.", "camp.")} · {num(c.results)} {t("рез.", "res.")}</span>
           </div>
         ))}
       </div>
@@ -328,56 +338,56 @@ function CampaignDetail({ campaignId, onBack }: { campaignId: number; onBack: ()
     }
   }, [campaignId]);
 
-  if (!data) return <div className="ana-loading">Загрузка…</div>;
+  if (!data) return <div className="ana-loading">{t("Загрузка…", "Loading…")}</div>;
   return (
     <div className="ana-detail">
       <div className="ana-detail-head">
-        <button type="button" className="ana-back" onClick={onBack}>← Все кампании</button>
+        <button type="button" className="ana-back" onClick={onBack}>← {t("Все кампании", "All campaigns")}</button>
         <div>
           <h2 className="ana-title">{data.name}</h2>
           <div className="ana-subtitle">
             {data.channel ? CHANNEL_LABEL[data.channel] ?? data.channel : "—"}
-            {data.objective ? ` · ${OBJECTIVE_LABEL[data.objective] ?? data.objective}` : ""}
+            {data.objective ? ` · ${objectiveLabel(data.objective)}` : ""}
           </div>
         </div>
       </div>
 
       <div className="ana-kpis">
-        <KpiCard label="Расход" value={money(data.spend)} delta={data.deltas?.spend} />
-        <KpiCard label="Показы" value={num(data.impressions)} sub={`Охват ${num(data.reach)}`} delta={data.deltas?.impressions} />
-        <KpiCard label="Частота" value={`${data.frequency}`} sub="показов на человека" />
-        <KpiCard label="Клики" value={num(data.clicks)} sub={`CTR ${data.ctr}%`} delta={data.deltas?.clicks} />
+        <KpiCard label={t("Расход", "Spend")} value={money(data.spend)} delta={data.deltas?.spend} />
+        <KpiCard label={t("Показы", "Impressions")} value={num(data.impressions)} sub={`${t("Охват", "Reach")} ${num(data.reach)}`} delta={data.deltas?.impressions} />
+        <KpiCard label={t("Частота", "Frequency")} value={`${data.frequency}`} sub={t("показов на человека", "impressions per person")} />
+        <KpiCard label={t("Клики", "Clicks")} value={num(data.clicks)} sub={`CTR ${data.ctr}%`} delta={data.deltas?.clicks} />
         <KpiCard label="CPC / CPM" value={`${data.cpc} / ${data.cpm} ₽`} />
-        <KpiCard label={data.result_label} value={num(data.results)} sub={`${data.cost_per_result} ₽ за результат`} delta={data.deltas?.results} />
+        <KpiCard label={data.result_label} value={num(data.results)} sub={`${data.cost_per_result} ₽ ${t("за результат", "per result")}`} delta={data.deltas?.results} />
         {data.roas != null && <KpiCard label="ROAS" value={`${data.roas}×`} />}
       </div>
 
-      <div className="ana-section-title">Воронка</div>
+      <div className="ana-section-title">{t("Воронка", "Funnel")}</div>
       <div className="ana-card-box">
         <Funnel impressions={data.impressions} clicks={data.clicks} results={data.results} resultLabel={data.result_label} />
       </div>
 
-      <div className="ana-section-title">Динамика за 14 дней</div>
+      <div className="ana-section-title">{t("Динамика за 14 дней", "14-day trend")}</div>
       <TrendChart series={data.series} deltas={data.deltas} />
 
       {data.platforms.length > 0 && (
         <>
-          <div className="ana-section-title">Площадки</div>
+          <div className="ana-section-title">{t("Площадки", "Platforms")}</div>
           <PlatformBars platforms={data.platforms} />
         </>
       )}
 
       {data.demographics.length > 0 && (
         <>
-          <div className="ana-section-title">Демография</div>
+          <div className="ana-section-title">{t("Демография", "Demographics")}</div>
           <div className="ana-card-box"><Demographics demographics={data.demographics} /></div>
         </>
       )}
 
       <div className="ana-reco-head-row">
-        <div className="ana-section-title">Рекомендации</div>
+        <div className="ana-section-title">{t("Рекомендации", "Recommendations")}</div>
         <button type="button" className="ana-cta" onClick={askCopilot} disabled={adviceLoading}>
-          {adviceLoading ? "Copilot думает…" : "✦ Получить предложения от Copilot"}
+          {adviceLoading ? t("Copilot думает…", "Copilot is thinking…") : t("✦ Получить предложения от Copilot", "✦ Get suggestions from Copilot")}
         </button>
       </div>
       <div className="ana-recos">
@@ -385,11 +395,11 @@ function CampaignDetail({ campaignId, onBack }: { campaignId: number; onBack: ()
       </div>
       {advice && (
         <div className="ana-advice">
-          <div className="ana-advice-head">✦ AdConnect Copilot советует</div>
+          <div className="ana-advice-head">{t("✦ AdConnect Copilot советует", "✦ AdConnect Copilot suggests")}</div>
           <div className="ana-advice-body">{advice}</div>
           <button type="button" className="ana-advice-link"
-            onClick={() => void sendMessage(`Как улучшить кампанию «${data.name}»? Что поменять в креативе и аудитории?`)}>
-            Обсудить с Copilot в чате →
+            onClick={() => void sendMessage(t(`Как улучшить кампанию «${data.name}»? Что поменять в креативе и аудитории?`, `How can I improve the “${data.name}” campaign? What should I change in the creative and audience?`))}>
+            {t("Обсудить с Copilot в чате →", "Discuss with Copilot in chat →")}
           </button>
         </div>
       )}
@@ -401,53 +411,53 @@ function Summary({ summary, onSelect }: { summary: AnalyticsSummary; onSelect: (
   if (!summary.campaign_count) {
     return (
       <div className="ana-empty">
-        <div className="ana-empty-title">Пока нет данных по кампаниям</div>
-        <div className="ana-empty-sub">Соберите кампанию — и здесь появится аналитика с графиками и рекомендациями.</div>
+        <div className="ana-empty-title">{t("Пока нет данных по кампаниям", "No campaign data yet")}</div>
+        <div className="ana-empty-sub">{t("Соберите кампанию — и здесь появится аналитика с графиками и рекомендациями.", "Build a campaign and analytics with charts and recommendations will appear here.")}</div>
       </div>
     );
   }
   return (
     <>
       <div className="ana-kpis">
-        <KpiCard label="Расход" value={money(summary.spend)} sub={`${summary.campaign_count} кампаний`} delta={summary.deltas?.spend} />
-        <KpiCard label="Показы" value={num(summary.impressions)} sub={`Охват ${num(summary.reach)}`} delta={summary.deltas?.impressions} />
-        <KpiCard label="Клики" value={num(summary.clicks)} sub={`CTR ${summary.ctr}%`} delta={summary.deltas?.clicks} />
+        <KpiCard label={t("Расход", "Spend")} value={money(summary.spend)} sub={`${summary.campaign_count} ${t("кампаний", "campaigns")}`} delta={summary.deltas?.spend} />
+        <KpiCard label={t("Показы", "Impressions")} value={num(summary.impressions)} sub={`${t("Охват", "Reach")} ${num(summary.reach)}`} delta={summary.deltas?.impressions} />
+        <KpiCard label={t("Клики", "Clicks")} value={num(summary.clicks)} sub={`CTR ${summary.ctr}%`} delta={summary.deltas?.clicks} />
         <KpiCard label="CPC / CPM" value={`${summary.cpc} / ${summary.cpm} ₽`} />
-        <KpiCard label="Результаты" value={num(summary.results)} sub={`${summary.cost_per_result} ₽ за результат`} delta={summary.deltas?.results} />
+        <KpiCard label={t("Результаты", "Results")} value={num(summary.results)} sub={`${summary.cost_per_result} ₽ ${t("за результат", "per result")}`} delta={summary.deltas?.results} />
       </div>
 
       {summary.recommendations.map((r, i) => <RecoCard key={i} rec={r} />)}
 
-      <div className="ana-section-title">Воронка (все кампании)</div>
+      <div className="ana-section-title">{t("Воронка (все кампании)", "Funnel (all campaigns)")}</div>
       <div className="ana-card-box">
-        <Funnel impressions={summary.impressions} clicks={summary.clicks} results={summary.results} resultLabel="Результаты" />
+        <Funnel impressions={summary.impressions} clicks={summary.clicks} results={summary.results} resultLabel={t("Результаты", "Results")} />
       </div>
 
       {summary.channels.length > 0 && (
         <>
-          <div className="ana-section-title">Распределение по каналам</div>
+          <div className="ana-section-title">{t("Распределение по каналам", "Channel distribution")}</div>
           <div className="ana-card-box"><ChannelDonut channels={summary.channels} /></div>
         </>
       )}
 
-      <div className="ana-section-title">Динамика за 14 дней (все кампании)</div>
+      <div className="ana-section-title">{t("Динамика за 14 дней (все кампании)", "14-day trend (all campaigns)")}</div>
       <TrendChart series={summary.series} deltas={summary.deltas} />
 
       {summary.platforms.length > 0 && (
         <>
-          <div className="ana-section-title">Площадки</div>
+          <div className="ana-section-title">{t("Площадки", "Platforms")}</div>
           <PlatformBars platforms={summary.platforms} />
         </>
       )}
 
       {summary.demographics.length > 0 && (
         <>
-          <div className="ana-section-title">Демография</div>
+          <div className="ana-section-title">{t("Демография", "Demographics")}</div>
           <div className="ana-card-box"><Demographics demographics={summary.demographics} /></div>
         </>
       )}
 
-      <div className="ana-section-title">Кампании</div>
+      <div className="ana-section-title">{t("Кампании", "Campaigns")}</div>
       <CampaignsTable rows={summary.campaigns} onSelect={onSelect} />
     </>
   );
@@ -466,8 +476,8 @@ function CampaignsTable({ rows, onSelect }: { rows: CampaignRow[]; onSelect: (id
     setSort((s) => (s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: -1 }));
   const arrow = (key: SortKey) => (sort.key === key ? (sort.dir === 1 ? " ▲" : " ▼") : "");
   const cols: Array<[SortKey, string]> = [
-    ["name", "Кампания"], ["channel", "Канал"], ["spend", "Расход"],
-    ["impressions", "Показы"], ["ctr", "CTR"], ["results", "Результаты"], ["cost_per_result", "Цена"],
+    ["name", t("Кампания", "Campaign")], ["channel", t("Канал", "Channel")], ["spend", t("Расход", "Spend")],
+    ["impressions", t("Показы", "Impressions")], ["ctr", "CTR"], ["results", t("Результаты", "Results")], ["cost_per_result", t("Цена", "Cost")],
   ];
   return (
     <div className="ana-table">
@@ -504,15 +514,15 @@ export function AnalyticsPage() {
   return (
     <div className="ana">
       <div className="ana-header">
-        <h1 className="ana-h1">Аналитика</h1>
-        <p className="ana-h1-sub">Сводка по кампаниям, динамика и рекомендации Copilot</p>
+        <h1 className="ana-h1">{t("Аналитика", "Analytics")}</h1>
+        <p className="ana-h1-sub">{t("Сводка по кампаниям, динамика и рекомендации Copilot", "Campaign summary, trends and Copilot recommendations")}</p>
       </div>
       {analyticsCampaignId != null ? (
         <CampaignDetail campaignId={analyticsCampaignId} onBack={() => setView("analytics", null)} />
       ) : summary ? (
         <Summary summary={summary} onSelect={(id) => setView("analytics", id)} />
       ) : (
-        <div className="ana-loading">Загрузка…</div>
+        <div className="ana-loading">{t("Загрузка…", "Loading…")}</div>
       )}
     </div>
   );

@@ -164,6 +164,22 @@ button.ac-side-item {
   font-size: 14px;
 }
 .ac-side-lang { gap: 12px; }
+button.ac-side-lang:hover { background: var(--ac-accent-soft); }
+.ac-side-lang-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--ac-border, #e2e8f0);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--ac-accent);
+  background: #fff;
+}
 
 /* ── Main / card ──────────────────────────────────────────────────────────── */
 
@@ -239,6 +255,11 @@ button.ac-side-item {
   padding: 12px 4px;
   border-bottom: 1px solid var(--ac-border-soft);
 }
+.ac-row-click { cursor: pointer; border-radius: 8px; transition: background .12s; }
+.ac-row-click:hover { background: var(--ac-accent-soft); }
+.ac-row-del { flex-shrink: 0; border: 0; background: none; cursor: pointer; color: var(--ac-text-muted); font-size: 14px; padding: 4px 8px; border-radius: 6px; }
+.ac-row-del:hover { color: #dc2626; background: #fef2f2; }
+.ac-empty { padding: 36px 8px; text-align: center; font-size: 14px; color: var(--ac-text-secondary); }
 .ac-row-icon { flex-shrink: 0; display: inline-flex; }
 .ac-row-body { flex: 1; min-width: 0; }
 .ac-row-name {
@@ -757,6 +778,21 @@ button.ac-side-item {
 
 /* Copilot-recommended marker (media generation) */
 .acw-copilot-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ac-accent); background: var(--ac-accent-soft); border-radius: 6px; padding: 4px 10px; margin-bottom: 10px; }
+
+/* Copilot audience auto-pick — sits above the (unchanged) parameter fields */
+.acw-copilot-aud {
+  border: 1px solid var(--ac-accent);
+  border-radius: 10px;
+  padding: 14px;
+  background: linear-gradient(180deg, var(--ac-accent-soft), transparent 140%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.acw-copilot-aud .acw-copilot-tag { margin-bottom: 0; }
+.acw-copilot-aud-input { min-height: 44px; }
+.acw-copilot-aud-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.acw-copilot-aud-foot .acw-hint { margin: 0; }
 
 /* KPI delta chips */
 .ana-kpi-foot { display: flex; align-items: center; gap: 8px; margin-top: 2px; flex-wrap: wrap; }

@@ -6,20 +6,22 @@
  * AI-виджет (FloatingWidget). Логики нет — чистая визуальная реконструкция.
  */
 
-import { useEffect, useState } from "react";
-import { listCampaigns, type CampaignSummary } from "../api/chatApi";
+import { useCallback, useEffect, useState } from "react";
+import { deleteCampaign, listCampaigns, type CampaignSummary } from "../api/chatApi";
 import { useChatWorkspaceStore } from "../chat-workspace/store/chatWorkspaceStore";
 import { CampaignWizard } from "./CampaignWizard";
 import { AnalyticsPage } from "./AnalyticsPage";
 import { ProfilePage } from "./ProfilePage";
 import { AudiencesPage } from "./AudiencesPage";
 import { LogoFull } from "./Logo";
+import { t, useLang } from "../i18n";
 
 const USER_EMAIL = "ivani_gp@starcorp.com";
 
-// ── Demo-данные списка кампаний ───────────────────────────────────────────────
+// ── Ad Campaigns list (rows come from the DB via /api/campaigns) ─────────────────
 
 interface CampaignRow {
+  campaignId: number;
   name: string;
   id: string;
   created: string;
@@ -29,34 +31,18 @@ interface CampaignRow {
   status: "moderation" | "active" | "draft";
 }
 
-const STATUS_META: Record<CampaignRow["status"], { label: string; className: string }> = {
-  moderation: { label: "Under moderation", className: "ac-pill-moderation" },
-  active: { label: "Active", className: "ac-pill-active" },
-  draft: { label: "Draft", className: "ac-pill-draft" },
+const STATUS_CLASS: Record<CampaignRow["status"], string> = {
+  moderation: "ac-pill-moderation",
+  active: "ac-pill-active",
+  draft: "ac-pill-draft",
 };
-
-const SMB_CAMPAIGNS: Array<{ name: string; channel: string; price: string }> = [
-  { name: "Фитнес-клуб «Энергия» — весенний набор", channel: "SMS", price: "25 000 ₽" },
-  { name: "Кофейня «Бариста» — акция на завтраки", channel: "SMS", price: "12 500 ₽" },
-  { name: "Автосервис «Гараж» — сезонная диагностика", channel: "Email", price: "8 000 ₽" },
-  { name: "Доставка еды «Вкусно и точка» — промо", channel: "SMS", price: "40 000 ₽" },
-  { name: "Студия маникюра «Лак» — приведи подругу", channel: "SMS", price: "9 900 ₽" },
-  { name: "Языковая школа «Lingva» — набор групп", channel: "Email", price: "15 000 ₽" },
-  { name: "Пекарня «Хлеб да соль» — открытие точки", channel: "SMS", price: "11 000 ₽" },
-  { name: "Барбершоп «Бритва» — скидка новым клиентам", channel: "SMS", price: "7 500 ₽" },
-  { name: "Цветочный «Букет» — 8 марта", channel: "SMS", price: "22 000 ₽" },
-  { name: "Стоматология «Улыбка» — чек-ап", channel: "Email", price: "18 000 ₽" },
-];
-
-const CAMPAIGNS: CampaignRow[] = SMB_CAMPAIGNS.map((c, i) => ({
-  name: c.name,
-  id: `${100240 + i}`,
-  created: "Date created: 14.04.2025",
-  period: "10.04.2025-20.05.2025",
-  channel: c.channel,
-  price: c.price,
-  status: "moderation" as const,
-}));
+function statusLabel(status: CampaignRow["status"]): string {
+  switch (status) {
+    case "moderation": return t("На модерации", "Under moderation");
+    case "active": return t("Активна", "Active");
+    case "draft": return t("Черновик", "Draft");
+  }
+}
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -115,12 +101,12 @@ function Chevron({ dir = "down" }: { dir?: "down" | "right" }) {
   );
 }
 
-function FlagIcon() {
+function GlobeIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <circle cx="10" cy="10" r="10" fill="#F0F0F0" />
-      <path d="M9.57 10H20a10 10 0 0 0-.34-2.6H9.57V10Zm0-5.2h8.97a10 10 0 0 0-2.31-2.61H9.57v2.61ZM10 20a10 10 0 0 0 6.23-2.17H3.77A10 10 0 0 0 10 20Zm-8.53-4.78h17.06a10 10 0 0 0 1.12-2.61H.35a10 10 0 0 0 1.12 2.61Z" fill="#D80027" />
-      <path d="M4.63 5.56h.91l-.84.61.32 1-.85-.62-.84.62.28-.86A10.05 10.05 0 0 0 1.66 8.48h.3l-.54.39a9.9 9.9 0 0 0-.24.43l.26.79-.48-.35a9.9 9.9 0 0 0-.33.79l.28.87h1.05l-.85.62.32 1-.85-.62-.5.36C.03 13.16 0 13.58 0 14h10V4c-1.98 0-3.82.57-5.37 1.56Z" fill="#0052B4" />
+      <circle cx="10" cy="10" r="8" stroke="#64748B" strokeWidth="1.4" />
+      <path d="M2 10h16M10 2c2.2 2 3.3 4.9 3.3 8s-1.1 6-3.3 8c-2.2-2-3.3-4.9-3.3-8S7.8 4 10 2Z"
+        stroke="#64748B" strokeWidth="1.4" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -165,6 +151,7 @@ function DocIcon() {
 // ── Top bar ─────────────────────────────────────────────────────────────────
 
 function AdcTopbar() {
+  const { t } = useLang();
   return (
     <header className="ac-topbar">
       <div className="ac-topbar-logo">
@@ -174,11 +161,11 @@ function AdcTopbar() {
       <div className="ac-topbar-right">
         <button className="ac-topbar-link" type="button">
           <SupportIcon />
-          <span>Support</span>
+          <span>{t("Поддержка", "Support")}</span>
         </button>
         <button className="ac-logout-btn" type="button">
           <LogoutIcon />
-          <span>Log out</span>
+          <span>{t("Выйти", "Log out")}</span>
         </button>
       </div>
     </header>
@@ -189,6 +176,7 @@ function AdcTopbar() {
 
 function AdcSidebar() {
   const { view, setView } = useChatWorkspaceStore();
+  const { lang, toggle, t } = useLang();
   return (
     <aside className="ac-sidebar">
       <nav className="ac-side-nav">
@@ -199,7 +187,7 @@ function AdcSidebar() {
         >
           <span className="ac-side-item-main">
             <CampaignsIcon />
-            <span>Ad Campaigns</span>
+            <span>{t("Рекламные кампании", "Ad Campaigns")}</span>
           </span>
         </button>
         <button
@@ -209,7 +197,7 @@ function AdcSidebar() {
         >
           <span className="ac-side-item-main">
             <SegmentsIcon />
-            <span>Audience Segments</span>
+            <span>{t("Сегменты аудитории", "Audience Segments")}</span>
           </span>
         </button>
         <button
@@ -219,7 +207,7 @@ function AdcSidebar() {
         >
           <span className="ac-side-item-main">
             <StatisticsIcon />
-            <span>Statistics</span>
+            <span>{t("Статистика", "Statistics")}</span>
           </span>
         </button>
       </nav>
@@ -228,7 +216,7 @@ function AdcSidebar() {
         <div className="ac-side-item">
           <span className="ac-side-item-main">
             <AccountIcon />
-            <span>Account</span>
+            <span>{t("Аккаунт", "Account")}</span>
           </span>
           <Chevron dir="down" />
         </div>
@@ -237,17 +225,23 @@ function AdcSidebar() {
           className={`ac-side-sub${view === "profile" ? " ac-side-sub-active" : ""}`}
           onClick={() => setView("profile")}
         >
-          Profile
+          {t("Профиль", "Profile")}
         </button>
-        <div className="ac-side-sub">Names of Senders</div>
-        <div className="ac-side-sub">Users</div>
-        <div className="ac-side-item ac-side-lang">
+        <div className="ac-side-sub">{t("Имена отправителей", "Names of Senders")}</div>
+        <div className="ac-side-sub">{t("Пользователи", "Users")}</div>
+        <button
+          type="button"
+          className="ac-side-item ac-side-lang"
+          onClick={toggle}
+          title={lang === "en" ? "Переключить на русский" : "Switch to English"}
+          aria-label={lang === "en" ? "Switch language, current: English" : "Сменить язык, текущий: русский"}
+        >
           <span className="ac-side-item-main">
-            <FlagIcon />
-            <span>English</span>
+            <GlobeIcon />
+            <span>{lang === "en" ? "English" : "Русский"}</span>
           </span>
-          <Chevron dir="right" />
-        </div>
+          <span className="ac-side-lang-code">{lang.toUpperCase()}</span>
+        </button>
       </div>
     </aside>
   );
@@ -256,22 +250,26 @@ function AdcSidebar() {
 // ── Ad Campaigns list (main screen) ────────────────────────────────────────────
 
 function StatusPill({ status }: { status: CampaignRow["status"] }) {
-  const meta = STATUS_META[status];
-  return <span className={`ac-pill ${meta.className}`}>{meta.label}</span>;
+  return <span className={`ac-pill ${STATUS_CLASS[status]}`}>{statusLabel(status)}</span>;
 }
 
-function CampaignListRow({ row }: { row: CampaignRow }) {
+function CampaignListRow({ row, onOpen, onDelete }: {
+  row: CampaignRow; onOpen: (id: number) => void; onDelete: (id: number) => void;
+}) {
+  const { t } = useLang();
   return (
-    <div className="ac-row">
+    <div className="ac-row ac-row-click" role="button" tabIndex={0} onClick={() => onOpen(row.campaignId)}>
       <span className="ac-row-icon"><DocIcon /></span>
       <div className="ac-row-body">
-        <a className="ac-row-name" href="#" onClick={(e) => e.preventDefault()}>{row.name}</a>
+        <span className="ac-row-name">{row.name}</span>
         <div className="ac-row-meta">ID {row.id} · {row.created}</div>
       </div>
       <div className="ac-row-period">{row.period}</div>
       <div className="ac-row-channel">{row.channel}</div>
       <div className="ac-row-price">{row.price}</div>
       <StatusPill status={row.status} />
+      <button type="button" className="ac-row-del" title={t("Удалить кампанию", "Delete campaign")}
+        onClick={(e) => { e.stopPropagation(); onDelete(row.campaignId); }}>✕</button>
     </div>
   );
 }
@@ -299,9 +297,10 @@ function campaignToRow(c: CampaignSummary): CampaignRow {
   const price = c.estimatedCost > 0 ? c.estimatedCost : c.budget ?? 0;
   const ch = c.channel || "sms";
   return {
+    campaignId: c.id,
     name: c.name,
     id: String(100000 + c.id),
-    created: c.createdAt ? `Date created: ${fmtDate(c.createdAt)}` : "",
+    created: c.createdAt ? `${t("Дата создания", "Date created")}: ${fmtDate(c.createdAt)}` : "",
     period: c.startDate && c.endDate ? `${c.startDate}-${c.endDate}` : "—",
     channel: CHANNEL_LABELS[ch] ?? ch.toUpperCase(),
     price: price > 0 ? `${fmtNumber(Math.round(price))} ₽` : "—",
@@ -310,31 +309,36 @@ function campaignToRow(c: CampaignSummary): CampaignRow {
 }
 
 function AdcCampaignsScreen() {
-  // Load persisted campaigns; fall back to the demo list when there are none yet
-  // (fresh install / backend offline) so the screen still looks like the product.
+  // Campaigns are read from the DB only — no frontend mock data.
   const [rows, setRows] = useState<CampaignRow[] | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    listCampaigns()
-      .then((cs) => { if (!cancelled) setRows(cs.length ? cs.map(campaignToRow) : CAMPAIGNS); })
-      .catch(() => { if (!cancelled) setRows(CAMPAIGNS); });
-    return () => { cancelled = true; };
+  const reload = useCallback(() => {
+    listCampaigns().then((cs) => setRows(cs.map(campaignToRow))).catch(() => setRows([]));
   }, []);
+  useEffect(() => { reload(); }, [reload]);
 
-  const { startCreating } = useChatWorkspaceStore();
-  const list = rows ?? CAMPAIGNS;
+  const { startCreating, setView } = useChatWorkspaceStore();
+  const { t } = useLang();
+  const remove = async (id: number) => {
+    if (!window.confirm(t("Удалить кампанию?", "Delete this campaign?"))) return;
+    try { await deleteCampaign(id); } finally { reload(); }
+  };
+  const list = rows ?? [];
+  const loading = rows === null;
   return (
     <div className="ac-card">
       <div className="ac-card-head">
         <div className="ac-card-head-row">
           <div>
-            <h1 className="ac-card-title">Advertising campaigns</h1>
+            <h1 className="ac-card-title">{t("Рекламные кампании", "Advertising campaigns")}</h1>
             <p className="ac-card-subtitle">
-              You can create an advertising campaign, view existing ones with their data, or delete them
+              {t(
+                "Создавайте рекламные кампании, смотрите существующие с их данными или удаляйте их",
+                "You can create an advertising campaign, view existing ones with their data, or delete them",
+              )}
             </p>
           </div>
           <button type="button" className="ac-create-btn" onClick={() => void startCreating()}>
-            + Создать кампанию
+            {t("+ Создать кампанию", "+ Create campaign")}
           </button>
         </div>
       </div>
@@ -342,26 +346,27 @@ function AdcCampaignsScreen() {
       <div className="ac-toolbar">
         <div className="ac-search">
           <SearchIcon />
-          <span className="ac-search-placeholder">Search</span>
+          <span className="ac-search-placeholder">{t("Поиск", "Search")}</span>
         </div>
         <div className="ac-toolbar-actions">
-          <button className="ac-toolbar-btn" type="button">Filters</button>
-          <button className="ac-toolbar-btn" type="button">Sort by date</button>
+          <button className="ac-toolbar-btn" type="button">{t("Фильтры", "Filters")}</button>
+          <button className="ac-toolbar-btn" type="button">{t("Сортировать по дате", "Sort by date")}</button>
           <span className="ac-toolbar-count">{list.length}</span>
         </div>
       </div>
 
-      <div className="ac-list">
-        {list.map((row, i) => (
-          <CampaignListRow key={i} row={row} />
-        ))}
-      </div>
-
-      <div className="ac-pagination">
-        {["1", "2", "3", "4", "5", "…", "12"].map((p, i) => (
-          <button key={i} type="button" className={`ac-page${p === "1" ? " ac-page-active" : ""}`}>{p}</button>
-        ))}
-      </div>
+      {loading ? (
+        <div className="ac-empty">{t("Загрузка…", "Loading…")}</div>
+      ) : list.length === 0 ? (
+        <div className="ac-empty">{t("Пока нет кампаний. Нажмите «+ Создать кампанию», чтобы собрать первую.", "No campaigns yet. Click “+ Create campaign” to build your first one.")}</div>
+      ) : (
+        <div className="ac-list">
+          {list.map((row) => (
+            <CampaignListRow key={row.campaignId} row={row}
+              onOpen={(id) => setView("analytics", id)} onDelete={remove} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
