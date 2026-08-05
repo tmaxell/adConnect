@@ -130,6 +130,16 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
   const [analyticsCampaignId, setAnalyticsCampaignId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
   const userActedRef = useRef(false);
+  // Сессия, на которой пользователь находится прямо сейчас. Асинхронные загрузки
+  // сверяются с ней перед тем, как класть результат в state: медленный
+  // GET /api/sessions/{id} (автовыбор последней сессии при открытии страницы)
+  // не должен «приземлиться» поверх свежего черновика после нажатия
+  // «+ Создать кампанию» — иначе в мастере открывается предыдущая кампания.
+  const activeSessionRef = useRef<string | null>(null);
+  const setActiveSession = useCallback((id: string | null) => {
+    activeSessionRef.current = id;
+    setActiveSessionId(id);
+  }, []);
   const bumpDraft = useCallback(() => setDraftRev((r) => r + 1), []);
   const setView = useCallback((v: "campaigns" | "analytics" | "profile" | "audiences", campaignId: number | null = null) => {
     setViewState(v);
@@ -180,22 +190,24 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
   const didAutoSelectRef = useRef(false);
 
   const selectSession = useCallback(async (sessionId: string) => {
-    setActiveSessionId(sessionId);
+    setActiveSession(sessionId);
     setLoadingMessages(true);
     setError(null);
     try {
       const detail = await getChat(sessionId);
+      if (activeSessionRef.current !== sessionId) return;   // пользователь уже ушёл на другую сессию
       setMessages(detail.messages.map((m) => ({ ...m })));
       setArtifacts(detail.artifacts);
       bumpDraft();
     } catch (e) {
+      if (activeSessionRef.current !== sessionId) return;
       setError(toError(e));
       setMessages([]);
       setArtifacts([]);
     } finally {
-      setLoadingMessages(false);
+      if (activeSessionRef.current === sessionId) setLoadingMessages(false);
     }
-  }, [bumpDraft]);
+  }, [bumpDraft, setActiveSession]);
 
   // Авто-выбор самой свежей сессии на старте. Раньше история подтягивалась
   // только после первого отправленного сообщения — при перезаходе на страницу
@@ -214,16 +226,17 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
     try {
       const session = await createChat();
       setSessions((prev) => [session, ...prev.filter((s) => s.id !== session.id)]);
-      setActiveSessionId(session.id);
+      setActiveSession(session.id);
       setMessages([]);
       setArtifacts([]);
+      setLoadingMessages(false);   // снимаем спиннер брошенной загрузки предыдущей сессии
       bumpDraft();
       return session.id;
     } catch (e) {
       setError(toError(e));
       throw e;
     }
-  }, [bumpDraft]);
+  }, [bumpDraft, setActiveSession]);
 
   const sendMessage = useCallback(
     async (content: string, action?: ChatAction) => {
@@ -268,6 +281,7 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
         // Подтягиваем canonical state с сервера — citations/trace в metadata теперь там.
         try {
           const detail = await getChat(sessionId);
+          if (activeSessionRef.current !== sessionId) return;   // ответ старой сессии не трогает новую
           setMessages(detail.messages.map((m) => ({ ...m })));
           setArtifacts(detail.artifacts);
           bumpDraft();
@@ -327,12 +341,17 @@ export function ChatWorkspaceProvider({ children }: { children: ReactNode }) {
     try {
       const sessionId = await createNewChat();     // new session ⇒ empty draft
       const draft = await patchDraft(sessionId, {}); // materialise the initial step
+      if (activeSessionRef.current !== sessionId) return;
       mergeDraftArtifact(draft);
+      bumpDraft();
+      // Open the wizard only on this fresh draft: if the session could not be
+      // created we stay on the campaigns list with an error instead of showing
+      // the previous session's draft.
+      setCreating(true);
     } catch (e) {
       setError(toError(e));
     }
-    setCreating(true);
-  }, [createNewChat, mergeDraftArtifact]);
+  }, [bumpDraft, createNewChat, mergeDraftArtifact]);
   const stopCreating = useCallback(() => setCreating(false), []);
 
   const generateCreativeAction = useCallback(
