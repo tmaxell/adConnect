@@ -181,6 +181,32 @@ async def test_audience_step_offered_even_when_prefilled(convo):
     assert convo.draft["step"] == "message"
 
 
+async def test_autofill_audience_keeps_the_step_and_the_brief(convo):
+    # Canvas «Подобрать аудиторию»: the hint describes the audience only.
+    await convo.send("Собери кампанию в Meta для фитнес-клуба")
+    goal_before = convo.draft["goal"]
+    await convo.send(action=action("select_channel", channel="meta"))
+
+    r = await convo.send("Женщины в Москве", action=action("autofill_audience"))
+    seg = convo.draft["segments"]
+    assert seg["geography"] == ["Москва"] and seg["demographics"] == "women"
+    # The hint must not leak into the brief — goal/product feed the ad copy and
+    # the creative preview, so a targeting phrase there shows up as ad text.
+    assert convo.draft["goal"] == goal_before
+    assert convo.draft["message"]["text"] is None
+    # And the canvas stays on the audience step until the user continues.
+    assert convo.draft["step"] == "segments"
+    assert seg["audience_confirmed"] is False
+    assert any(a.id == "keep_audience" for a in r.actions)
+
+
+async def test_autofill_audience_does_not_set_goal_on_a_fresh_draft(convo):
+    # No prior turn → the goal fallback must not swallow the audience hint.
+    await convo.send("Женщины в Москве", action=action("autofill_audience"))
+    assert convo.draft["goal"] is None
+    assert convo.draft["segments"]["geography"] == ["Москва"]
+
+
 async def test_whatsapp_carousel_flow(convo):
     # "WhatsApp" (no FB/IG context) routes to the operator WhatsApp Business channel.
     await convo.send("Создай рекламную кампанию в WhatsApp для фитнес-клуба")

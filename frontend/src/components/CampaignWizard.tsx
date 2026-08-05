@@ -831,16 +831,19 @@ function OperatorExtraFilters({ draft, api }: { draft: CampaignDraft; api: Wizar
 // Routes through the existing chat agent (`sendMessage`) so no backend change is
 // needed; the request text is Russian because the agent runs server-side in RU.
 
-function CopilotAudienceAssist({ draft }: { draft: CampaignDraft }) {
+function CopilotAudienceAssist() {
   const { sendMessage, sending } = useChatWorkspaceStore();
   const [hint, setHint] = useState("");
-  const whatsapp = draft.channel === "whatsapp";
+  // Отправляем структурное действие, а не текстовую инструкцию: пожелание — это
+  // описание аудитории, и оно не должно разбираться как бриф. Иначе инструкция
+  // оседала в draft.goal и потом всплывала текстом на превью объявления.
   const run = () => {
-    const base = whatsapp
-      ? "Подбери аудиторию для этой WhatsApp-кампании на основе брифа и заполни параметры аудитории (сегмент абонентской базы, гео, демография, интересы)."
-      : "Подбери аудиторию для этой кампании на основе брифа и заполни параметры аудитории (гео, возраст, пол, интересы, источник).";
-    const text = hint.trim() ? `${base} Учти пожелание: ${hint.trim()}.` : base;
-    void sendMessage(text);
+    void sendMessage(hint.trim(), {
+      id: "autofill_audience",
+      label: t("Подобрать аудиторию", "Pick audience"),
+      kind: "primary",
+      payload: {},
+    });
   };
   return (
     <div className="acw-copilot-aud">
@@ -906,7 +909,7 @@ function MetaAudienceStep({ draft, api }: { draft: CampaignDraft; api: WizardApi
         <AudienceGauge reach={draft.audience_reach || 0} />
       </Field>
 
-      {advantage && <CopilotAudienceAssist draft={draft} />}
+      {advantage && <CopilotAudienceAssist />}
 
       {/* Audience source — operator Custom Audience seed + optional Lookalike. */}
       <Field label={t("Источник аудитории", "Audience source")}>
@@ -1092,7 +1095,7 @@ function WhatsAppAudienceStep({ draft, api }: { draft: CampaignDraft; api: Wizar
         <span className="acw-source-tag">opt-in</span>
         <span>{t("Сообщения уходят только подписчикам с WhatsApp, давшим согласие (покрытие ≈ 70% базы).", "Messages go only to WhatsApp subscribers who opted in (coverage ≈ 70% of the base).")}</span>
       </div>
-      <CopilotAudienceAssist draft={draft} />
+      <CopilotAudienceAssist />
       <OperatorSegmentsStep draft={draft} api={api} />
     </>
   );

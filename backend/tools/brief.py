@@ -139,6 +139,8 @@ Possible fields:
 - budget: number (rubles)
 - messages_count: integer
 Omit any field you are unsure about. Never invent values.
+Keep values in the language of the user's message — never transliterate city names
+("в городе Иваново" → ["Иваново"], not ["Ivanovo"]).
 IMPORTANT: do NOT infer audience parameters (geography, age, interests, income, demographics)
 from the product or business type — set them ONLY if the user explicitly describes the target
 audience. "Кампания для фитнес-клуба" → just {"product":"фитнес-клуб"} (no interests/age).
@@ -271,4 +273,25 @@ async def update_draft_from_message(
         merge_updates(draft, await _llm_updates(message, history))
     if draft.goal is None and message.strip():
         draft.goal = message.strip()[:200]
+    return draft
+
+
+async def fill_audience_from_hint(
+    draft: CampaignDraft,
+    hint: str,
+    *,
+    history: list[dict[str, Any]] | None = None,
+    use_llm: bool = True,
+) -> CampaignDraft:
+    """Merge ONLY audience fields from a hint (canvas «Подобрать аудиторию»).
+
+    Anything else the extractor returns (goal, product, message_text, channel) is
+    dropped: the hint describes the target audience, not the brief. Without this
+    the request would land in `goal` and then surface as the ad copy in the
+    creative preview and the confirmation summary.
+    """
+    updates = _heuristic_updates(hint)
+    if use_llm:
+        updates.update(await _llm_updates(hint, history))
+    merge_updates(draft, {k: v for k, v in updates.items() if k in _SEGMENT_FIELDS})
     return draft

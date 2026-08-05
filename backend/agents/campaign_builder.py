@@ -31,7 +31,7 @@ from tools import context
 from tools import creative_gen
 from tools import creatives as creatives_tool
 from tools import naming
-from tools.brief import merge_updates, update_draft_from_message
+from tools.brief import fill_audience_from_hint, merge_updates, update_draft_from_message
 from tools.catalog import CHANNELS, SEGMENTS_BY_ID, is_network_channel, match_segments
 from tools.forecast import apply_forecast
 
@@ -53,7 +53,11 @@ async def execute(ctx: AgentContext) -> AgentResult:
     draft = _load_draft(ctx)
     prior_step = draft.step  # the step the user was answering this turn
     if draft.goal is None:
-        goal = ctx.inputs.get("goal") or ctx.message
+        # ctx.message is the campaign goal only on a free-text turn. On an action
+        # turn it carries text that belongs to that action (e.g. the audience hint
+        # of autofill_audience) and must never become the goal — the goal is shown
+        # as the ad copy in the creative preview and in the summary.
+        goal = ctx.inputs.get("goal") or ("" if action_id else ctx.message)
         draft.goal = (goal or "").strip()[:200] or None
 
     # 1. Apply the turn. Actions either return a specialized result (suggest /
@@ -219,6 +223,9 @@ async def _handle_action(ctx: AgentContext, draft: CampaignDraft, action_id: str
     if action_id == "suggest_audience":
         return await _suggest_audience(ctx, draft)
 
+    if action_id == "autofill_audience":
+        return await _autofill_audience(ctx, draft)
+
     if action_id == "generate_creatives":
         return await _generate_creatives(ctx, draft)
 
@@ -251,6 +258,47 @@ async def _suggest_audience(ctx: AgentContext, draft: CampaignDraft) -> AgentRes
     lines.append("\nВыберите сегмент или опишите аудиторию своими словами.")
     apply_forecast(draft)
     return _wrap(draft, "\n".join(lines), actions, substep="audience")
+
+
+async def _autofill_audience(ctx: AgentContext, draft: CampaignDraft) -> AgentResult:
+    """Canvas «Подобрать аудиторию»: fill the audience params and stay on the step.
+
+    Only segment fields are written — the hint describes the audience, not the
+    brief. The audience is deliberately left *unconfirmed*: the user reviews the
+    filled fields and moves on with «Продолжить», so the canvas does not jump to
+    the next step on its own.
+    """
+    hint = (ctx.message or "").strip()
+    if hint:
+        await fill_audience_from_hint(draft, hint, history=ctx.history)
+    if not _audience_hint(draft):
+        # Nothing usable in the hint → derive the parameters from the brief via
+        # the operator segment catalog (spec fields only, no segment binding).
+        # Only a real keyword match counts: match_segments falls back to the
+        # broadest segments (score 0.3) for any input, and pasting their spec in
+        # would look like a pick while being pure noise.
+        query = " ".join(filter(None, [draft.product, draft.goal, hint]))
+        matches = [m for m in match_segments(query, limit=1) if m.score > 0.3] if query else []
+        if matches:
+            merge_updates(draft, dict(matches[0].segment.spec))
+            await ctx.emit("tool_called", detail=f"match_segments → {matches[0].segment.id}")
+    apply_forecast(draft)
+    # Держим мастер на шаге аудитории: даже если сегмент уже был выбран раньше
+    # (audience_confirmed / matched_segment_id), подбор параметров не должен
+    # перебрасывать холст на следующий шаг — пользователь листает сам.
+    draft.step = "segments"
+
+    filled = _audience_hint(draft)
+    reach = f"{draft.audience_reach:,}".replace(",", " ")
+    msg = (
+        (f"Заполнил параметры аудитории: **{filled}**.\n\n" if filled
+         else "Пока не хватает данных для подбора — опишите аудиторию словами или задайте параметры на холсте.\n\n")
+        + f"Охват ≈ **{reach}**. Проверьте параметры на холсте и нажмите «Продолжить», когда всё верно."
+    )
+    return _wrap(draft, msg, [
+        ChatAction(id="keep_audience", label="Продолжить с этой аудиторией", kind="primary", payload={}),
+        ChatAction(id="suggest_audience", label="Показать сегменты оператора", kind="default", payload={}),
+    ], substep="audience")
 
 
 async def _copy_context(ctx: AgentContext, draft: CampaignDraft) -> dict[str, Any]:
@@ -587,11 +635,14 @@ def _infer_objective(goal: str | None) -> str:
     return "traffic"
 
 
+_DEMOGRAPHICS_LABEL = {"men": "мужчины", "women": "женщины"}
+
+
 def _audience_hint(draft: CampaignDraft) -> str:
     seg = draft.segments
     parts = list(seg.geography) + list(seg.interests) + list(seg.age)
     if seg.demographics != "all":
-        parts.append(seg.demographics)
+        parts.append(_DEMOGRAPHICS_LABEL.get(seg.demographics, seg.demographics))
     return ", ".join(parts)
 
 

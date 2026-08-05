@@ -30,6 +30,7 @@ _ACTION_AGENT: dict[str, str] = {
     "keep_audience": "campaign_builder",
     "toggle_lookalike": "campaign_builder",
     "suggest_audience": "campaign_builder",
+    "autofill_audience": "campaign_builder",
     "generate_creatives": "campaign_builder",
     "generate_creative_image": "campaign_builder",
     "select_format": "campaign_builder",
