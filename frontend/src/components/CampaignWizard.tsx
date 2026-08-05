@@ -1690,7 +1690,9 @@ function ConfirmationStep({ draft }: { draft: CampaignDraft }) {
       <Field label={t("Название кампании", "Campaign name")}>
         <div className="acw-input-mock">{draft.name || <span className="acw-placeholder">{t("Название", "Name")}</span>}</div>
       </Field>
-      {draft.message.text && (
+      {/* У WhatsApp креатив — это карусель выше; общее «Сообщение» скрываем,
+          иначе в сводку протекает message.text от ранее выбранного канала. */}
+      {!whatsapp && draft.message.text && (
         <Field label={t("Сообщение", "Message")}><div className="acw-textarea-mock">{draft.message.text}</div></Field>
       )}
       {draft.status === "submitted" && (

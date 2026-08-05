@@ -226,7 +226,7 @@ def recommendations(m: CampaignAnalytics) -> list[Recommendation]:
         recs.append(Recommendation(
             severity="warning", title="Высокая частота показов",
             detail=(f"Частота {m.frequency} — аудитория видит рекламу слишком часто (усталость). "
-                    "Расширьте аудиторию или включите Advantage+, либо обновите креатив."),
+                    "Расширьте аудиторию или включите автоподбор AdConnect Copilot, либо обновите креатив."),
             action="expand_audience", action_label="Расширить аудиторию",
         ))
     if m.cpm > _CPM_HIGH:
