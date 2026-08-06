@@ -238,6 +238,12 @@ def _canon_list_item(key: str, item: str) -> str:
             if low.startswith(alias) or (alias.startswith(low) and len(low) >= 3):
                 return canon
         return raw
+    if key == "age":
+        # The canvas field holds ranges ("18-30"); the LLM sometimes answers with
+        # a phrase ("средних лет"). Keep the range, drop anything else — an empty
+        # string is skipped by the caller.
+        m = _AGE_RE.search(raw)
+        return f"{m.group(1)}-{m.group(2)}" if m else ""
     return raw
 
 

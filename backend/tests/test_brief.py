@@ -76,3 +76,10 @@ async def test_geo_and_interests_canonicalized_no_duplicates():
     merge_updates(draft, {"geography": ["Москва", "Казань"], "interests": ["спорт", "путешествия"]})
     assert draft.segments.geography == ["Москва", "Казань"]
     assert draft.segments.interests == ["sport", "travel"]
+
+
+def test_age_values_are_kept_as_ranges():
+    """The canvas age field holds ranges — free-text ages are dropped, not shown."""
+    draft = CampaignDraft()
+    merge_updates(draft, {"age": ["средних лет", "30 - 45", "25-35"]})
+    assert draft.segments.age == ["30-45", "25-35"]
